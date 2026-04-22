@@ -1,0 +1,35 @@
+# Build artifacts (should land in CloudCompare/build/, but just in case)
+*.obj
+*.lib
+*.dll
+*.exe
+*.pdb
+*.exp
+*.ilk
+*.idb
+
+# Qt-generated (MOC/UIC/RCC outputs)
+moc_*.cpp
+moc_*.h
+ui_*.h
+qrc_*.cpp
+
+# Visual Studio / VS Code per-user state
+.vs/
+.vscode/
+*.user
+*.vcxproj.user
+*.filters.user
+*.suo
+*.VC.db
+*.VC.VC.opendb
+
+# CMake artifacts (if ever written in-tree)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+
+# OS
+Thumbs.db
+.DS_Store

@@ -1,0 +1,13 @@
+{
+	"type" : "Standard",
+	"name" : "qTracer",
+	"icon" : ":/CC/plugin/qTracer/images/icon.png",
+	"description" : "DFN fracture trace extraction pipeline (Compute Eigen features → DBSCAN clustering → Create traces → Trace clustering → Plane fitting).",
+	"authors" : [
+		{ "name" : "Jate" }
+	],
+	"maintainers" : [
+		{ "name" : "Jate" }
+	],
+	"references" : []
+}

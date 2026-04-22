@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>PipelineDialog</class>
+ <widget class="QDialog" name="PipelineDialog">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>440</width><height>720</height></rect>
+  </property>
+  <property name="windowTitle">
+   <string>qTracer — Fracture Extraction Pipeline</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QLabel" name="infoLabel">
+     <property name="text">
+      <string>Runs the full pipeline in one go:
+Compute Eigen → DBSCAN → Create Traces → Trace Clustering → Plane Fitting.
+Intermediate and final groups are added to the DB tree.</string>
+     </property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+
+   <!-- Stage 1 : Compute Eigen -->
+   <item>
+    <widget class="QGroupBox" name="eigenGroup">
+     <property name="title"><string>1. Compute Eigen Features</string></property>
+     <layout class="QFormLayout" name="eigenForm">
+      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Kernel radius</string></property></widget></item>
+      <item row="0" column="1">
+       <widget class="QDoubleSpinBox" name="kernelRadiusSpinBox">
+        <property name="toolTip"><string>Neighbourhood sphere radius for per-point feature computation</string></property>
+        <property name="decimals"><number>4</number></property>
+        <property name="minimum"><double>0.000100000000000</double></property>
+        <property name="maximum"><double>10000.000000000000000</double></property>
+        <property name="singleStep"><double>0.010000000000000</double></property>
+        <property name="value"><double>0.100000000000000</double></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <!-- Stage 2 : DBSCAN -->
+   <item>
+    <widget class="QGroupBox" name="dbscanGroup">
+     <property name="title"><string>2. DBSCAN Clustering</string></property>
+     <layout class="QFormLayout" name="dbscanForm">
+      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Neighbourhood radius</string></property></widget></item>
+      <item row="0" column="1">
+       <widget class="QDoubleSpinBox" name="dbscanRadiusSpinBox">
+        <property name="decimals"><number>4</number></property>
+        <property name="minimum"><double>0.000100000000000</double></property>
+        <property name="maximum"><double>10000.000000000000000</double></property>
+        <property name="singleStep"><double>0.010000000000000</double></property>
+        <property name="value"><double>0.030000000000000</double></property>
+       </widget>
+      </item>
+      <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Min neighbours</string></property></widget></item>
+      <item row="1" column="1">
+       <widget class="QSpinBox" name="dbscanMinPointsSpinBox">
+        <property name="minimum"><number>1</number></property>
+        <property name="maximum"><number>1000000</number></property>
+        <property name="value"><number>50</number></property>
+       </widget>
+      </item>
+      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Max angle (deg)</string></property></widget></item>
+      <item row="2" column="1">
+       <widget class="QDoubleSpinBox" name="dbscanMaxAngleSpinBox">
+        <property name="decimals"><number>2</number></property>
+        <property name="minimum"><double>0.000000000000000</double></property>
+        <property name="maximum"><double>90.000000000000000</double></property>
+        <property name="singleStep"><double>1.000000000000000</double></property>
+        <property name="value"><double>15.000000000000000</double></property>
+       </widget>
+      </item>
+      <item row="3" column="0"><widget class="QLabel"><property name="text"><string>Linearity threshold</string></property></widget></item>
+      <item row="3" column="1">
+       <widget class="QDoubleSpinBox" name="dbscanLinearitySpinBox">
+        <property name="decimals"><number>3</number></property>
+        <property name="minimum"><double>0.000000000000000</double></property>
+        <property name="maximum"><double>1.000000000000000</double></property>
+        <property name="singleStep"><double>0.010000000000000</double></property>
+        <property name="value"><double>0.900000000000000</double></property>
+       </widget>
+      </item>
+      <item row="4" column="0"><widget class="QLabel"><property name="text"><string>Search neighbourhood</string></property></widget></item>
+      <item row="4" column="1">
+       <widget class="QComboBox" name="dbscanSearchTypeComboBox">
+        <item><property name="text"><string>Cylinder (along MaxEigVec)</string></property></item>
+        <item><property name="text"><string>Sphere</string></property></item>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <!-- Stage 3 : Create Traces -->
+   <item>
+    <widget class="QGroupBox" name="tracesGroup">
+     <property name="title"><string>3. Create Traces (Facets)</string></property>
+     <layout class="QVBoxLayout" name="tracesLayout">
+      <item>
+       <widget class="QCheckBox" name="randomColorsCheckBox">
+        <property name="text"><string>Random facet colors (else: color by dip / dip-dir)</string></property>
+        <property name="checked"><bool>false</bool></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <!-- Stage 4 : Trace Clustering -->
+   <item>
+    <widget class="QGroupBox" name="clusteringGroup">
+     <property name="title"><string>4. Trace Clustering</string></property>
+     <layout class="QFormLayout" name="clusteringForm">
+      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Cone radius</string></property></widget></item>
+      <item row="0" column="1">
+       <widget class="QDoubleSpinBox" name="coneRadiusSpinBox">
+        <property name="decimals"><number>4</number></property>
+        <property name="minimum"><double>0.000100000000000</double></property>
+        <property name="maximum"><double>10000.000000000000000</double></property>
+        <property name="singleStep"><double>0.010000000000000</double></property>
+        <property name="value"><double>0.100000000000000</double></property>
+       </widget>
+      </item>
+      <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Two-trace distance</string></property></widget></item>
+      <item row="1" column="1">
+       <widget class="QDoubleSpinBox" name="twoTraceDistSpinBox">
+        <property name="decimals"><number>4</number></property>
+        <property name="minimum"><double>0.000100000000000</double></property>
+        <property name="maximum"><double>10000.000000000000000</double></property>
+        <property name="singleStep"><double>0.010000000000000</double></property>
+        <property name="value"><double>0.500000000000000</double></property>
+       </widget>
+      </item>
+      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Min angle (deg)</string></property></widget></item>
+      <item row="2" column="1">
+       <widget class="QDoubleSpinBox" name="clusterMinAngleSpinBox">
+        <property name="decimals"><number>2</number></property>
+        <property name="minimum"><double>0.000000000000000</double></property>
+        <property name="maximum"><double>90.000000000000000</double></property>
+        <property name="singleStep"><double>1.000000000000000</double></property>
+        <property name="value"><double>20.000000000000000</double></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <!-- Stage 5 : Plane Fitting -->
+   <item>
+    <widget class="QGroupBox" name="planeGroup">
+     <property name="title"><string>5. Plane Fitting</string></property>
+     <layout class="QFormLayout" name="planeForm">
+      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Intersection-line distance</string></property></widget></item>
+      <item row="0" column="1">
+       <widget class="QDoubleSpinBox" name="planeIntersectionDistSpinBox">
+        <property name="decimals"><number>4</number></property>
+        <property name="minimum"><double>0.000100000000000</double></property>
+        <property name="maximum"><double>10000.000000000000000</double></property>
+        <property name="singleStep"><double>0.010000000000000</double></property>
+        <property name="value"><double>0.100000000000000</double></property>
+       </widget>
+      </item>
+      <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Min trace length</string></property></widget></item>
+      <item row="1" column="1">
+       <widget class="QDoubleSpinBox" name="planeMinTraceLenSpinBox">
+        <property name="decimals"><number>4</number></property>
+        <property name="minimum"><double>0.000000000000000</double></property>
+        <property name="maximum"><double>10000.000000000000000</double></property>
+        <property name="singleStep"><double>0.010000000000000</double></property>
+        <property name="value"><double>0.010000000000000</double></property>
+       </widget>
+      </item>
+      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Min intersection angle (deg)</string></property></widget></item>
+      <item row="2" column="1">
+       <widget class="QDoubleSpinBox" name="planeMinAngleSpinBox">
+        <property name="decimals"><number>2</number></property>
+        <property name="minimum"><double>0.000000000000000</double></property>
+        <property name="maximum"><double>90.000000000000000</double></property>
+        <property name="singleStep"><double>1.000000000000000</double></property>
+        <property name="value"><double>30.000000000000000</double></property>
+       </widget>
+      </item>
+      <item row="3" column="0"><widget class="QLabel"><property name="text"><string>Max end-point distance</string></property></widget></item>
+      <item row="3" column="1">
+       <widget class="QDoubleSpinBox" name="planeMaxEndPointDistSpinBox">
+        <property name="decimals"><number>4</number></property>
+        <property name="minimum"><double>0.000100000000000</double></property>
+        <property name="maximum"><double>10000.000000000000000</double></property>
+        <property name="singleStep"><double>0.010000000000000</double></property>
+        <property name="value"><double>0.200000000000000</double></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <item>
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="standardButtons"><set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set></property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <connections>
+  <connection>
+   <sender>buttonBox</sender><signal>accepted()</signal>
+   <receiver>PipelineDialog</receiver><slot>accept()</slot>
+   <hints><hint type="sourcelabel"><x>0</x><y>0</y></hint><hint type="destinationlabel"><x>0</x><y>0</y></hint></hints>
+  </connection>
+  <connection>
+   <sender>buttonBox</sender><signal>rejected()</signal>
+   <receiver>PipelineDialog</receiver><slot>reject()</slot>
+   <hints><hint type="sourcelabel"><x>0</x><y>0</y></hint><hint type="destinationlabel"><x>0</x><y>0</y></hint></hints>
+  </connection>
+ </connections>
+</ui>
