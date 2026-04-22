@@ -30,6 +30,8 @@ public:
 
 private:
 	void doPipeline();
+	void doColorFilter();
 
-	QAction* m_action = nullptr;
+	QAction* m_action            = nullptr;
+	QAction* m_colorFilterAction = nullptr;
 };

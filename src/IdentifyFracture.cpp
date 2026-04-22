@@ -242,22 +242,32 @@ bool IdentifyFracture::ComputeParametersAtLevel(const DgmOctree::octreeCell& cel
 
 int IdentifyFracture::runDBSCAN(const DgmOctree* octree,
                                 GenericIndexedCloudPersist* cloud,
-                                const DBSCANParams& params)
+                                const DBSCANParams& params,
+                                GenericProgressCallback* progressCb /*=nullptr*/)
 {
 	ccPointCloud* pc = static_cast<ccPointCloud*>(cloud);
 	pc->addScalarField("DBSCAN");
 	pc->setCurrentScalarField(pc->getScalarFieldIndexByName("DBSCAN"));
 
-	for (unsigned i = 0; i < pc->size(); ++i)
+	const unsigned total = pc->size();
+	for (unsigned i = 0; i < total; ++i)
 	{
 		pc->setPointScalarValue(i, static_cast<ScalarType>(-1)); // UNCLASSIFIED
 	}
 
+	if (progressCb)
+	{
+		progressCb->setMethodTitle("DBSCAN");
+		progressCb->setInfo(QString("Clustering %1 points…").arg(total).toUtf8().constData());
+		progressCb->start();
+	}
+	NormalizedProgress nProgress(progressCb, std::max<unsigned>(total, 1));
+
 	unsigned clusterID = 1;
 
-	for (unsigned i = 0; i < pc->size(); ++i)
+	for (unsigned i = 0; i < total; ++i)
 	{
-		std::cout << "Percent = " << double(i) / double(pc->size()) << std::endl;
+		std::cout << "Percent = " << double(i) / double(total) << std::endl;
 		if (pc->getPointScalarValue(i) == -1)
 		{
 			if (IdentifyFracture::expandCluster(octree, cloud, i, clusterID, params) != FAILURE)
@@ -265,7 +275,11 @@ int IdentifyFracture::runDBSCAN(const DgmOctree* octree,
 				clusterID += 1;
 			}
 		}
+		nProgress.oneStep();
 	}
+
+	if (progressCb)
+		progressCb->stop();
 
 	return 0;
 }
@@ -279,11 +293,14 @@ void IdentifyFracture::SetScalarValueToNOISE(const CCVector3& /*P*/, ScalarType&
 ccHObject* IdentifyFracture::TraceClustering(const ccHObject* ccGroup,
                                              double ConeRadius,
                                              double TwoTraceDist,
-                                             double MinAngle)
+                                             double MinAngle,
+                                             GenericProgressCallback* progressCb /*=nullptr*/)
 {
+	const unsigned totalTraces = ccGroup->getChildrenNumber();
+
 	//build searching group
 	ccHObject* victim = new ccHObject("victim");
-	for (unsigned i = 0; i < ccGroup->getChildrenNumber(); i++)
+	for (unsigned i = 0; i < totalTraces; i++)
 	{
 		victim->addChild(ccGroup->getChild(i)->getChild(2)->getChild(0));
 		QString Name = QString("Trace %1").arg(i);
@@ -291,6 +308,14 @@ ccHObject* IdentifyFracture::TraceClustering(const ccHObject* ccGroup,
 	}
 
 	ccHObject* Traces = new ccHObject("Traces");
+
+	if (progressCb)
+	{
+		progressCb->setMethodTitle("Trace Clustering");
+		progressCb->setInfo(QString("Merging %1 traces…").arg(totalTraces).toUtf8().constData());
+		progressCb->start();
+	}
+	NormalizedProgress nProgress(progressCb, std::max<unsigned>(totalTraces, 1));
 
 	unsigned tracenumber = 0;
 
@@ -384,6 +409,7 @@ ccHObject* IdentifyFracture::TraceClustering(const ccHObject* ccGroup,
 			InfectedGroup->getFirstChild()->setEnabled(true);
 			DieGroup->addChild(InfectedGroup->getFirstChild());
 			InfectedGroup->detachChild(InfectedGroup->getFirstChild());
+			nProgress.oneStep();
 		}
 
 		ccPointCloud* PC_die = new ccPointCloud();
@@ -434,6 +460,9 @@ ccHObject* IdentifyFracture::TraceClustering(const ccHObject* ccGroup,
 
 	delete victim;
 	std::cout << "end" << std::endl;
+
+	if (progressCb)
+		progressCb->stop();
 
 	return Traces;
 }
@@ -566,7 +595,8 @@ int IdentifyFracture::expandCluster(const DgmOctree* octree,
 ccHObject* IdentifyFracture::createTraces(ccPointCloud* cloud,
                                           ReferenceCloudContainer& components,
                                           bool randomColors,
-                                          bool& error)
+                                          bool& error,
+                                          GenericProgressCallback* progressCb /*=nullptr*/)
 {
 	if (!cloud)
 		return nullptr;
@@ -576,6 +606,15 @@ ccHObject* IdentifyFracture::createTraces(ccPointCloud* cloud,
 	ccGroup->setVisible(true);
 
 	bool cloudHasNormal = cloud->hasNormals();
+
+	const unsigned totalComponents = static_cast<unsigned>(components.size());
+	if (progressCb)
+	{
+		progressCb->setMethodTitle("Create Traces");
+		progressCb->setInfo(QString("Building %1 facets…").arg(totalComponents).toUtf8().constData());
+		progressCb->start();
+	}
+	NormalizedProgress nProgress(progressCb, std::max<unsigned>(totalComponents, 1));
 
 	error = false;
 	while (!components.empty())
@@ -672,6 +711,8 @@ ccHObject* IdentifyFracture::createTraces(ccPointCloud* cloud,
 
 		delete compIndexes;
 		compIndexes = nullptr;
+
+		nProgress.oneStep();
 	}
 
 	if (ccGroup->getChildrenNumber() == 0)
@@ -679,6 +720,9 @@ ccHObject* IdentifyFracture::createTraces(ccPointCloud* cloud,
 		delete ccGroup;
 		ccGroup = nullptr;
 	}
+
+	if (progressCb)
+		progressCb->stop();
 
 	return ccGroup;
 }
@@ -688,12 +732,21 @@ ccHObject* IdentifyFracture::PlaneFitting(const ccHObject* ccGroup,
                                           double IntersectionLineDistance,
                                           double MinTraceLength,
                                           double MinIntersectionAngle,
-                                          double MinCorrDist)
+                                          double MinCorrDist,
+                                          GenericProgressCallback* progressCb /*=nullptr*/)
 {
 	ccHObject* FitJointPlanes = new ccHObject("Fit Joint Planes");
 	unsigned FitPlaneIndex = 0;
 	unsigned totalnum = ccGroup->getChildrenNumber();
 	std::cout << "Start Plane Fitting, Planes number = " << int(totalnum) << std::endl;
+
+	if (progressCb)
+	{
+		progressCb->setMethodTitle("Plane Fitting");
+		progressCb->setInfo(QString("Pairing %1 traces…").arg(totalnum).toUtf8().constData());
+		progressCb->start();
+	}
+	NormalizedProgress nProgress(progressCb, std::max<unsigned>(totalnum, 1));
 
 	for (unsigned i = 0; i < totalnum; ++i)
 	{
@@ -745,7 +798,12 @@ ccHObject* IdentifyFracture::PlaneFitting(const ccHObject* ccGroup,
 				}
 			}
 		}
+		nProgress.oneStep();
 	}
+
+	if (progressCb)
+		progressCb->stop();
+
 	return FitJointPlanes;
 }
 

@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ColorFilterDialog</class>
+ <widget class="QDialog" name="ColorFilterDialog">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>560</width><height>380</height></rect>
+  </property>
+  <property name="windowTitle">
+   <string>qTracer — Color Filter</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QLabel" name="infoLabel">
+     <property name="text">
+      <string>C = a·R + b·G + c·B    (a, b, c ∈ [0, 1])
+Points are kept iff Cmin ≤ C ≤ Cmax. e.g. to filter by R alone: a=1, b=0, c=0.</string>
+     </property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+
+   <!-- Coefficients a, b, c (each 0..1) -->
+   <item>
+    <widget class="QGroupBox" name="coeffGroup">
+     <property name="title"><string>Coefficients  (0..1)</string></property>
+     <layout class="QGridLayout">
+      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>a (R weight)</string></property></widget></item>
+      <item row="0" column="1"><widget class="QSlider" name="aSlider"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="minimum"><number>0</number></property><property name="maximum"><number>100</number></property><property name="value"><number>100</number></property></widget></item>
+      <item row="0" column="2">
+       <widget class="QDoubleSpinBox" name="aSpinBox">
+        <property name="decimals"><number>2</number></property>
+        <property name="minimum"><double>0.000000000000000</double></property>
+        <property name="maximum"><double>1.000000000000000</double></property>
+        <property name="singleStep"><double>0.010000000000000</double></property>
+        <property name="value"><double>1.000000000000000</double></property>
+       </widget>
+      </item>
+
+      <item row="1" column="0"><widget class="QLabel"><property name="text"><string>b (G weight)</string></property></widget></item>
+      <item row="1" column="1"><widget class="QSlider" name="bSlider"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="minimum"><number>0</number></property><property name="maximum"><number>100</number></property><property name="value"><number>100</number></property></widget></item>
+      <item row="1" column="2">
+       <widget class="QDoubleSpinBox" name="bSpinBox">
+        <property name="decimals"><number>2</number></property>
+        <property name="minimum"><double>0.000000000000000</double></property>
+        <property name="maximum"><double>1.000000000000000</double></property>
+        <property name="singleStep"><double>0.010000000000000</double></property>
+        <property name="value"><double>1.000000000000000</double></property>
+       </widget>
+      </item>
+
+      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>c (B weight)</string></property></widget></item>
+      <item row="2" column="1"><widget class="QSlider" name="cSlider"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="minimum"><number>0</number></property><property name="maximum"><number>100</number></property><property name="value"><number>100</number></property></widget></item>
+      <item row="2" column="2">
+       <widget class="QDoubleSpinBox" name="cSpinBox">
+        <property name="decimals"><number>2</number></property>
+        <property name="minimum"><double>0.000000000000000</double></property>
+        <property name="maximum"><double>1.000000000000000</double></property>
+        <property name="singleStep"><double>0.010000000000000</double></property>
+        <property name="value"><double>1.000000000000000</double></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <!-- C thresholds: histogram with two draggable cursors + spinboxes -->
+   <item>
+    <widget class="QGroupBox" name="cRangeGroup">
+     <property name="title"><string>C threshold  (drag green/red lines on the histogram, or type exact values)</string></property>
+     <layout class="QVBoxLayout">
+      <item>
+       <widget class="HistogramRangeWidget" name="histogramWidget" native="true">
+        <property name="minimumSize">
+         <size><width>0</width><height>140</height></size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout">
+        <item><widget class="QLabel"><property name="text"><string>Min</string></property></widget></item>
+        <item>
+         <widget class="QDoubleSpinBox" name="cMinSpinBox">
+          <property name="decimals"><number>2</number></property>
+          <property name="minimum"><double>-100000.000000000000000</double></property>
+          <property name="maximum"><double>100000.000000000000000</double></property>
+          <property name="singleStep"><double>1.000000000000000</double></property>
+          <property name="value"><double>0.000000000000000</double></property>
+         </widget>
+        </item>
+        <item>
+         <spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer>
+        </item>
+        <item><widget class="QLabel"><property name="text"><string>Max</string></property></widget></item>
+        <item>
+         <widget class="QDoubleSpinBox" name="cMaxSpinBox">
+          <property name="decimals"><number>2</number></property>
+          <property name="minimum"><double>-100000.000000000000000</double></property>
+          <property name="maximum"><double>100000.000000000000000</double></property>
+          <property name="singleStep"><double>1.000000000000000</double></property>
+          <property name="value"><double>765.000000000000000</double></property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <item>
+    <layout class="QHBoxLayout" name="bottomRow">
+     <item>
+      <widget class="QLabel" name="keptLabel">
+       <property name="text"><string>Kept: — / —</string></property>
+      </widget>
+     </item>
+     <item>
+      <spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="resetButton">
+       <property name="text"><string>Reset</string></property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+
+   <item>
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="standardButtons"><set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set></property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>HistogramRangeWidget</class>
+   <extends>QWidget</extends>
+   <header>HistogramRangeWidget.h</header>
+   <container>0</container>
+  </customwidget>
+ </customwidgets>
+ <connections>
+  <connection>
+   <sender>buttonBox</sender><signal>accepted()</signal>
+   <receiver>ColorFilterDialog</receiver><slot>accept()</slot>
+   <hints><hint type="sourcelabel"><x>0</x><y>0</y></hint><hint type="destinationlabel"><x>0</x><y>0</y></hint></hints>
+  </connection>
+  <connection>
+   <sender>buttonBox</sender><signal>rejected()</signal>
+   <receiver>ColorFilterDialog</receiver><slot>reject()</slot>
+   <hints><hint type="sourcelabel"><x>0</x><y>0</y></hint><hint type="destinationlabel"><x>0</x><y>0</y></hint></hints>
+  </connection>
+ </connections>
+</ui>

@@ -10,4 +10,10 @@ if ( PLUGIN_STANDARD_QTRACER )
 	add_subdirectory( include )
 	add_subdirectory( src )
 	add_subdirectory( ui )
+
+	# QCustomPlot for the color-filter histogram widget
+	target_link_libraries( ${PROJECT_NAME}
+		QCustomPlot
+		Qt6::PrintSupport
+	)
 endif()

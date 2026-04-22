@@ -1,6 +1,8 @@
 
 target_sources( ${PROJECT_NAME}
 	PRIVATE
+		${CMAKE_CURRENT_LIST_DIR}/ColorFilterDlg.h
+		${CMAKE_CURRENT_LIST_DIR}/HistogramRangeWidget.h
 		${CMAKE_CURRENT_LIST_DIR}/IdentifyFracture.h
 		${CMAKE_CURRENT_LIST_DIR}/PipelineDlg.h
 		${CMAKE_CURRENT_LIST_DIR}/disclaimerDialog.h

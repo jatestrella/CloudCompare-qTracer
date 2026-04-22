@@ -69,7 +69,8 @@ public:
 	//! Run the custom DBSCAN-like clustering on a cloud that already has the Eigen SFs
 	static int runDBSCAN(const CCCoreLib::DgmOctree* octree,
 	                     CCCoreLib::GenericIndexedCloudPersist* cloud,
-	                     const DBSCANParams& params);
+	                     const DBSCANParams& params,
+	                     CCCoreLib::GenericProgressCallback* progressCb = nullptr);
 
 	static int expandCluster(const CCCoreLib::DgmOctree* octree,
 	                         CCCoreLib::GenericIndexedCloudPersist* cloud,
@@ -81,20 +82,23 @@ public:
 	static ccHObject* createTraces(ccPointCloud* cloud,
 	                               CCCoreLib::ReferenceCloudContainer& components,
 	                               bool randomColors,
-	                               bool& error);
+	                               bool& error,
+	                               CCCoreLib::GenericProgressCallback* progressCb = nullptr);
 
 	//! Merge close-and-collinear traces into combined traces
 	static ccHObject* TraceClustering(const ccHObject* ccGroup,
 	                                  double ConeRadius,
 	                                  double TwoTraceDist,
-	                                  double MinAngle);
+	                                  double MinAngle,
+	                                  CCCoreLib::GenericProgressCallback* progressCb = nullptr);
 
 	//! Reconstruct joint planes from pairs of near-intersecting traces
 	static ccHObject* PlaneFitting(const ccHObject* ccGroup,
 	                               double IntersectionLineDistance,
 	                               double MinTraceLength,
 	                               double MinIntersectionAngle,
-	                               double MinCorrDist);
+	                               double MinCorrDist,
+	                               CCCoreLib::GenericProgressCallback* progressCb = nullptr);
 
 	static CCVector3d CalculateMaximumEigenVector(CCCoreLib::GenericIndexedCloudPersist* inputCloud);
 	static CCVector3  GetPointMaxEigVecFromSF(CCCoreLib::GenericIndexedCloudPersist* cloud, int pointIndex);
