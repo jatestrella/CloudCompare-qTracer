@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- outcrop patch -->
+  <polygon points="6,10 13,4 25,6 29,15 25,26 15,28 4,20"
+           fill="#c6d5ad" stroke="#2d4218" stroke-width="1.6" stroke-linejoin="round"/>
+  <!-- triangulation fan from interior point -->
+  <g stroke="#2d4218" stroke-width="0.9" fill="none">
+    <line x1="16" y1="16" x2="6"  y2="10"/>
+    <line x1="16" y1="16" x2="13" y2="4"/>
+    <line x1="16" y1="16" x2="25" y2="6"/>
+    <line x1="16" y1="16" x2="29" y2="15"/>
+    <line x1="16" y1="16" x2="25" y2="26"/>
+    <line x1="16" y1="16" x2="15" y2="28"/>
+    <line x1="16" y1="16" x2="4"  y2="20"/>
+  </g>
+  <!-- centroid marker -->
+  <circle cx="16" cy="16" r="1.6" fill="#2d4218"/>
+</svg>

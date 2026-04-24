@@ -8,6 +8,21 @@ class PipelineDlg : public QDialog, public Ui::PipelineDialog
 public:
 	explicit PipelineDlg(QWidget* parent = nullptr);
 
+	void accept() override;
+
+	// --- Which stages to run ---
+	bool stage1Enabled() const { return eigenGroup->isChecked(); }
+	bool stage2Enabled() const { return dbscanGroup->isChecked(); }
+	bool stage3Enabled() const { return tracesGroup->isChecked(); }
+	bool stage4Enabled() const { return clusteringGroup->isChecked(); }
+	bool stage5Enabled() const { return planeGroup->isChecked(); }
+	bool stage6Enabled() const { return mergeGroup->isChecked(); }
+
+	bool stageEnabled(int n) const;
+	int  firstEnabledStage() const;  // 1..6, or 0 if none
+	int  lastEnabledStage()  const;  // 1..6, or 0 if none
+	bool stagesAreContiguous() const;
+
 	// Stage 1
 	double kernelRadius() const { return kernelRadiusSpinBox->value(); }
 
@@ -31,4 +46,9 @@ public:
 	double planeMinTraceLength()         const { return planeMinTraceLenSpinBox->value(); }
 	double planeMinIntersectionAngleDeg() const { return planeMinAngleSpinBox->value(); }
 	double planeMaxEndPointDist()        const { return planeMaxEndPointDistSpinBox->value(); }
+
+	// Stage 6
+	double   mergeMaxNormalAngleDeg() const { return mergeMaxNormalAngleSpinBox->value(); }
+	double   mergeMaxPlaneDist()      const { return mergeMaxPlaneDistSpinBox->value(); }
+	unsigned mergeMaxPasses()         const { return static_cast<unsigned>(mergeMaxPassesSpinBox->value()); }
 };

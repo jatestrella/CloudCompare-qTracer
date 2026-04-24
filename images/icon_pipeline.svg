@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- rock silhouette (irregular polygon) -->
+  <polygon points="5,9 10,4 24,5 28,12 27,25 19,28 6,26 4,15"
+           fill="#a89580" stroke="#3d2f1e" stroke-width="1.6" stroke-linejoin="round"/>
+  <!-- fractures -->
+  <g fill="none" stroke="#1a1004" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 12 L14 16 L12 22 L18 26"/>
+    <path d="M11 8 L19 11 L24 10"/>
+    <path d="M22 7 L21 18 L27 22"/>
+  </g>
+</svg>

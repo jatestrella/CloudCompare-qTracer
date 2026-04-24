@@ -92,7 +92,13 @@ public:
 	                                  double MinAngle,
 	                                  CCCoreLib::GenericProgressCallback* progressCb = nullptr);
 
-	//! Reconstruct joint planes from pairs of near-intersecting traces
+	//! Reconstruct joint planes from pairs of near-intersecting traces.
+	/** For each candidate pair of combined traces (filtered by the geometric tests
+	 *  \p IntersectionLineDistance, \p MinTraceLength, \p MinIntersectionAngle,
+	 *  \p MinCorrDist), pool all member-trace endpoints from both combined traces
+	 *  and fit a `ccFacet` on the pooled cloud — much more robust than fitting on
+	 *  just the 4 combined-trace endpoints.
+	 */
 	static ccHObject* PlaneFitting(const ccHObject* ccGroup,
 	                               double IntersectionLineDistance,
 	                               double MinTraceLength,
@@ -100,10 +106,50 @@ public:
 	                               double MinCorrDist,
 	                               CCCoreLib::GenericProgressCallback* progressCb = nullptr);
 
+	//! Merge near-coplanar joint planes using a sequential-RANSAC scheme.
+	/** Each pass picks the unconsumed seed plane that has the largest "consensus"
+	 *  set — peers whose normals are within \p maxNormalAngleDeg and whose centers
+	 *  are within \p maxPlaneDist of the seed's plane. The consensus group is then
+	 *  re-fit into a single `ccFacet` using the union of all member origin points,
+	 *  and removed from the pool. The pass repeats until no planes remain.
+	 *
+	 *  \p maxPasses controls how many times the whole procedure is re-run on the
+	 *  previous pass's output. Because merging changes plane centers/normals, new
+	 *  coplanar opportunities can emerge. Iteration stops early once the plane
+	 *  count stops decreasing. Intermediate groups are deleted; the returned
+	 *  group is owned by the caller.
+	 */
+	static ccHObject* MergeCoplanarPlanes(const ccHObject* planesGroup,
+	                                      double maxNormalAngleDeg,
+	                                      double maxPlaneDist,
+	                                      unsigned maxPasses = 1,
+	                                      CCCoreLib::GenericProgressCallback* progressCb = nullptr);
+
+private:
+	//! Single pass of coplanar-plane merging (internal helper).
+	static ccHObject* MergeCoplanarPlanesOnce(const ccHObject* planesGroup,
+	                                          double maxNormalAngleDeg,
+	                                          double maxPlaneDist,
+	                                          CCCoreLib::GenericProgressCallback* progressCb);
+
+public:
+
 	static CCVector3d CalculateMaximumEigenVector(CCCoreLib::GenericIndexedCloudPersist* inputCloud);
 	static CCVector3  GetPointMaxEigVecFromSF(CCCoreLib::GenericIndexedCloudPersist* cloud, int pointIndex);
 	static bool       InCone(const CCVector3& A, const CCVector3& B, double radius, const CCVector3& P);
 	static void       SetScalarValueToNOISE(const CCVector3& P, ScalarType& scalarValue);
+
+	//! Compute the two trace polyline endpoints for a cluster.
+	/** Projects every point onto \p unitEigVec (about the centroid) and returns the
+	 *  extreme projections as \p p0 (min) and \p p1 (max). This gives the actual
+	 *  extent of the cluster along its principal axis — more accurate than the
+	 *  original port's "bbox-diagonal length, bbox-center origin" approach, which
+	 *  systematically over-estimated trace length whenever the principal axis was
+	 *  not aligned with world axes.
+	 */
+	static void ComputeTraceEndpoints(const CCCoreLib::GenericIndexedCloud* cloud,
+	                                  const CCVector3& unitEigVec,
+	                                  CCVector3& p0, CCVector3& p1);
 
 protected:
 
@@ -111,5 +157,4 @@ protected:
 	                                     void** additionalParameters,
 	                                     CCCoreLib::NormalizedProgress* nProgress = nullptr);
 
-	static ScalarType GetCloudLinearity(CCCoreLib::ReferenceCloud* cloud);
 };

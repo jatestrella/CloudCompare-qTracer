@@ -24,6 +24,8 @@ Intermediate and final groups are added to the DB tree.</string>
    <item>
     <widget class="QGroupBox" name="eigenGroup">
      <property name="title"><string>1. Compute Eigen Features</string></property>
+     <property name="checkable"><bool>true</bool></property>
+     <property name="checked"><bool>true</bool></property>
      <layout class="QFormLayout" name="eigenForm">
       <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Kernel radius</string></property></widget></item>
       <item row="0" column="1">
@@ -44,6 +46,8 @@ Intermediate and final groups are added to the DB tree.</string>
    <item>
     <widget class="QGroupBox" name="dbscanGroup">
      <property name="title"><string>2. DBSCAN Clustering</string></property>
+     <property name="checkable"><bool>true</bool></property>
+     <property name="checked"><bool>true</bool></property>
      <layout class="QFormLayout" name="dbscanForm">
       <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Neighbourhood radius</string></property></widget></item>
       <item row="0" column="1">
@@ -98,6 +102,8 @@ Intermediate and final groups are added to the DB tree.</string>
    <item>
     <widget class="QGroupBox" name="tracesGroup">
      <property name="title"><string>3. Create Traces (Facets)</string></property>
+     <property name="checkable"><bool>true</bool></property>
+     <property name="checked"><bool>true</bool></property>
      <layout class="QVBoxLayout" name="tracesLayout">
       <item>
        <widget class="QCheckBox" name="randomColorsCheckBox">
@@ -113,6 +119,8 @@ Intermediate and final groups are added to the DB tree.</string>
    <item>
     <widget class="QGroupBox" name="clusteringGroup">
      <property name="title"><string>4. Trace Clustering</string></property>
+     <property name="checkable"><bool>true</bool></property>
+     <property name="checked"><bool>true</bool></property>
      <layout class="QFormLayout" name="clusteringForm">
       <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Cone radius</string></property></widget></item>
       <item row="0" column="1">
@@ -152,6 +160,8 @@ Intermediate and final groups are added to the DB tree.</string>
    <item>
     <widget class="QGroupBox" name="planeGroup">
      <property name="title"><string>5. Plane Fitting</string></property>
+     <property name="checkable"><bool>true</bool></property>
+     <property name="checked"><bool>true</bool></property>
      <layout class="QFormLayout" name="planeForm">
       <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Intersection-line distance</string></property></widget></item>
       <item row="0" column="1">
@@ -191,6 +201,48 @@ Intermediate and final groups are added to the DB tree.</string>
         <property name="maximum"><double>10000.000000000000000</double></property>
         <property name="singleStep"><double>0.010000000000000</double></property>
         <property name="value"><double>0.200000000000000</double></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <!-- Stage 6 : Merge Coplanar Planes -->
+   <item>
+    <widget class="QGroupBox" name="mergeGroup">
+     <property name="title"><string>6. Merge Coplanar Planes</string></property>
+     <property name="checkable"><bool>true</bool></property>
+     <property name="checked"><bool>true</bool></property>
+     <layout class="QFormLayout" name="mergeForm">
+      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Max normal angle (deg)</string></property></widget></item>
+      <item row="0" column="1">
+       <widget class="QDoubleSpinBox" name="mergeMaxNormalAngleSpinBox">
+        <property name="toolTip"><string>Two planes whose normals differ by more than this angle will NOT be merged.</string></property>
+        <property name="decimals"><number>2</number></property>
+        <property name="minimum"><double>0.000000000000000</double></property>
+        <property name="maximum"><double>90.000000000000000</double></property>
+        <property name="singleStep"><double>1.000000000000000</double></property>
+        <property name="value"><double>10.000000000000000</double></property>
+       </widget>
+      </item>
+      <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Max plane distance</string></property></widget></item>
+      <item row="1" column="1">
+       <widget class="QDoubleSpinBox" name="mergeMaxPlaneDistSpinBox">
+        <property name="toolTip"><string>Max perpendicular distance from a peer plane's center to the seed plane.</string></property>
+        <property name="decimals"><number>4</number></property>
+        <property name="minimum"><double>0.000100000000000</double></property>
+        <property name="maximum"><double>10000.000000000000000</double></property>
+        <property name="singleStep"><double>0.010000000000000</double></property>
+        <property name="value"><double>0.050000000000000</double></property>
+       </widget>
+      </item>
+      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Max passes</string></property></widget></item>
+      <item row="2" column="1">
+       <widget class="QSpinBox" name="mergeMaxPassesSpinBox">
+        <property name="toolTip"><string>How many times to re-run the merge on its own output. Stops early if the plane count stops decreasing.</string></property>
+        <property name="minimum"><number>1</number></property>
+        <property name="maximum"><number>100</number></property>
+        <property name="value"><number>10</number></property>
        </widget>
       </item>
      </layout>

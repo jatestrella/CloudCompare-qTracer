@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- outcrop rectangle -->
+  <rect x="3" y="10" width="26" height="18" fill="#e8d8b5" stroke="#3d2f1e" stroke-width="1.4"/>
+  <!-- traces -->
+  <g stroke="#b22" stroke-width="1.4" stroke-linecap="round">
+    <line x1="6"  y1="14" x2="14" y2="25"/>
+    <line x1="18" y1="12" x2="10" y2="26"/>
+    <line x1="14" y1="12" x2="26" y2="25"/>
+    <line x1="23" y1="14" x2="27" y2="22"/>
+  </g>
+  <!-- P21 label -->
+  <text x="2" y="8" font-family="Verdana,Arial,sans-serif" font-size="7.5" font-weight="bold" fill="#111">P21</text>
+</svg>

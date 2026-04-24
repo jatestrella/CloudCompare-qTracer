@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- backing plate -->
+  <rect x="3" y="5" width="26" height="22" rx="1.5" fill="#f7f7f5" stroke="#333" stroke-width="1.1"/>
+  <!-- RGB bars -->
+  <rect x="4" y="7"  width="24" height="5" fill="#e23c3c"/>
+  <rect x="4" y="13" width="24" height="5" fill="#3ec23c"/>
+  <rect x="4" y="19" width="24" height="5" fill="#3c6ce2"/>
+  <!-- threshold cursor -->
+  <rect x="20" y="3" width="1.8" height="26" fill="#111"/>
+  <polygon points="18,3 23.6,3 20.9,7"  fill="#111"/>
+  <polygon points="18,29 23.6,29 20.9,25" fill="#111"/>
+</svg>

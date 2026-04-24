@@ -27,13 +27,56 @@
 
 //system
 #include <algorithm>
-#include <iostream>
+#include <limits>
 #include <vector>
 
 //Qt
 #include <QString>
 
 using namespace CCCoreLib;
+
+
+void IdentifyFracture::ComputeTraceEndpoints(const GenericIndexedCloud* cloud,
+                                             const CCVector3& unitEigVec,
+                                             CCVector3& p0, CCVector3& p1)
+{
+	const unsigned nPts = cloud ? cloud->size() : 0;
+	if (nPts == 0)
+	{
+		p0 = p1 = CCVector3(0, 0, 0);
+		return;
+	}
+
+	// Centroid (in double for numerical stability)
+	CCVector3d centroid(0, 0, 0);
+	for (unsigned i = 0; i < nPts; ++i)
+	{
+		const CCVector3* p = cloud->getPoint(i);
+		centroid.x += p->x;
+		centroid.y += p->y;
+		centroid.z += p->z;
+	}
+	centroid /= static_cast<double>(nPts);
+	const CCVector3 centroidF(static_cast<PointCoordinateType>(centroid.x),
+	                          static_cast<PointCoordinateType>(centroid.y),
+	                          static_cast<PointCoordinateType>(centroid.z));
+
+	double tMin = std::numeric_limits<double>::max();
+	double tMax = -std::numeric_limits<double>::max();
+	for (unsigned i = 0; i < nPts; ++i)
+	{
+		const CCVector3* p = cloud->getPoint(i);
+		const double dx = static_cast<double>(p->x) - centroid.x;
+		const double dy = static_cast<double>(p->y) - centroid.y;
+		const double dz = static_cast<double>(p->z) - centroid.z;
+		const double t  = dx * unitEigVec.x + dy * unitEigVec.y + dz * unitEigVec.z;
+		if (t < tMin) tMin = t;
+		if (t > tMax) tMax = t;
+	}
+
+	p0 = centroidF + unitEigVec * static_cast<PointCoordinateType>(tMin);
+	p1 = centroidF + unitEigVec * static_cast<PointCoordinateType>(tMax);
+}
 
 
 CCVector3d IdentifyFracture::CalculateMaximumEigenVector(GenericIndexedCloudPersist* inputCloud)
@@ -267,7 +310,6 @@ int IdentifyFracture::runDBSCAN(const DgmOctree* octree,
 
 	for (unsigned i = 0; i < total; ++i)
 	{
-		std::cout << "Percent = " << double(i) / double(total) << std::endl;
 		if (pc->getPointScalarValue(i) == -1)
 		{
 			if (IdentifyFracture::expandCluster(octree, cloud, i, clusterID, params) != FAILURE)
@@ -333,8 +375,6 @@ ccHObject* IdentifyFracture::TraceClustering(const ccHObject* ccGroup,
 
 		while (InfectedGroup->getFirstChild())
 		{
-			std::cout << "Now infect: " << InfectedGroup->getFirstChild()->getName().toStdString() << std::endl;
-
 			ccGenericPointCloud* Trace_i = ccHObjectCaster::ToGenericPointCloud(InfectedGroup->getFirstChild(), nullptr);
 			GenericIndexedCloud* IndexedTrace_i = static_cast<GenericIndexedCloud*>(Trace_i);
 			CCVector3 Point_i1 = *(IndexedTrace_i->getPoint(0));
@@ -425,22 +465,16 @@ ccHObject* IdentifyFracture::TraceClustering(const ccHObject* ccGroup,
 		}
 
 		CCVector3 ExtractFracture_MaxEigVec = IdentifyFracture::CalculateMaximumEigenVector(PC_die).toFloat();
-		CCVector3 ExtractFracture_bbMin;
-		CCVector3 ExtractFracture_bbMax;
-		PC_die->getBoundingBox(ExtractFracture_bbMin, ExtractFracture_bbMax);
-		float Fracture_HalfLength = 0.5f * static_cast<float>(std::sqrt(
-			std::pow(ExtractFracture_bbMax[0] - ExtractFracture_bbMin[0], 2)
-			+ std::pow(ExtractFracture_bbMax[1] - ExtractFracture_bbMin[1], 2)
-			+ std::pow(ExtractFracture_bbMax[2] - ExtractFracture_bbMin[2], 2)));
-		CCVector3 ExtractFracture_Center = (ExtractFracture_bbMax + ExtractFracture_bbMin) * 0.5f;
+		CCVector3 p0, p1;
+		IdentifyFracture::ComputeTraceEndpoints(PC_die, ExtractFracture_MaxEigVec, p0, p1);
 
 		ccPointCloud* TipVertices = new ccPointCloud();
 		ccPolyline* TracePoly = new ccPolyline(TipVertices);
 		TracePoly->addChild(TipVertices);
 
 		TipVertices->reserve(2);
-		TipVertices->addPoint(ExtractFracture_Center + ExtractFracture_MaxEigVec * Fracture_HalfLength);
-		TipVertices->addPoint(ExtractFracture_Center - ExtractFracture_MaxEigVec * Fracture_HalfLength);
+		TipVertices->addPoint(p0);
+		TipVertices->addPoint(p1);
 
 		TipVertices->setEnabled(false);
 
@@ -459,7 +493,6 @@ ccHObject* IdentifyFracture::TraceClustering(const ccHObject* ccGroup,
 	}
 
 	delete victim;
-	std::cout << "end" << std::endl;
 
 	if (progressCb)
 		progressCb->stop();
@@ -481,16 +514,26 @@ int IdentifyFracture::expandCluster(const DgmOctree* octree,
 	const int                 SearchType           = params.searchType;
 
 	ccPointCloud* pc = static_cast<ccPointCloud*>(cloud);
-	pc->setCurrentScalarField(pc->getScalarFieldIndexByName("PC Linearity"));
-	ScalarType Corelinearity = cloud->getPointScalarValue(corePointIndex);
-	pc->setCurrentScalarField(pc->getScalarFieldIndexByName("DBSCAN"));
-	CCVector3 CoreMaxEigVec = GetPointMaxEigVecFromSF(cloud, corePointIndex);
+
+	// Cache SF pointers once so the inner loops can read/write directly without
+	// repeated string-based getScalarFieldIndexByName / setCurrentScalarField calls.
+	ScalarField* linearitySF = pc->getScalarField(pc->getScalarFieldIndexByName("PC Linearity"));
+	ScalarField* eigXSF      = pc->getScalarField(pc->getScalarFieldIndexByName("MaxEigVec_X"));
+	ScalarField* eigYSF      = pc->getScalarField(pc->getScalarFieldIndexByName("MaxEigVec_Y"));
+	ScalarField* eigZSF      = pc->getScalarField(pc->getScalarFieldIndexByName("MaxEigVec_Z"));
+	ScalarField* dbscanSF    = pc->getScalarField(pc->getScalarFieldIndexByName("DBSCAN"));
+
+	auto maxEigVecAt = [eigXSF, eigYSF, eigZSF](unsigned idx) {
+		return CCVector3(eigXSF->getValue(idx), eigYSF->getValue(idx), eigZSF->getValue(idx));
+	};
+
+	ScalarType Corelinearity = linearitySF->getValue(corePointIndex);
+	CCVector3  CoreMaxEigVec = maxEigVecAt(corePointIndex);
 
 	unsigned char level = octree->findBestLevelForAGivenNeighbourhoodSizeExtraction(radius);
 	DgmOctree::NeighboursSet CoreCloud;
 	CCVector3 vec;
 	cloud->getPoint(corePointIndex, vec);
-	size_t num = 0;
 	if (SearchType == 1)
 	{
 		DgmOctree::CylindricalNeighbourhood cylParams;
@@ -502,12 +545,12 @@ int IdentifyFracture::expandCluster(const DgmOctree* octree,
 		cylParams.level           = level;
 		cylParams.onlyPositiveDir = false;
 
-		num = octree->getPointsInCylindricalNeighbourhood(cylParams);
+		octree->getPointsInCylindricalNeighbourhood(cylParams);
 		CoreCloud = cylParams.neighbours;
 	}
 	else if (SearchType == 2)
 	{
-		num = octree->getPointsInSphericalNeighbourhood(vec, radius, CoreCloud, level);
+		octree->getPointsInSphericalNeighbourhood(vec, radius, CoreCloud, level);
 	}
 
 	DgmOctreeReferenceCloud CoreCloud_ref(&CoreCloud, 0);
@@ -519,76 +562,61 @@ int IdentifyFracture::expandCluster(const DgmOctree* octree,
 		CoreCloud_ref.forEach(IdentifyFracture::SetScalarValueToNOISE);
 		return FAILURE;
 	}
-	else
+
+	int index = 0, indexCorePoint = 0;
+	for (auto iterSeeds = CoreCloud.begin(); iterSeeds != CoreCloud.end(); ++iterSeeds)
 	{
-		int index = 0, indexCorePoint = 0;
-		DgmOctree::NeighboursSet::iterator iterSeeds;
-		for (iterSeeds = CoreCloud.begin(); iterSeeds != CoreCloud.end(); ++iterSeeds)
-		{
-			pc->setCurrentScalarField(pc->getScalarFieldIndexByName("DBSCAN"));
-			cloud->setPointScalarValue(iterSeeds->pointIndex, static_cast<ScalarType>(clusterID));
+		dbscanSF->setValue(iterSeeds->pointIndex, static_cast<ScalarType>(clusterID));
 
-			if (iterSeeds->point == cloud->getPoint(corePointIndex))
-			{
-				indexCorePoint = index;
-			}
-			++index;
+		if (iterSeeds->point == cloud->getPoint(corePointIndex))
+			indexCorePoint = index;
+		++index;
+	}
+	CoreCloud.erase(CoreCloud.begin() + indexCorePoint);
+
+	for (size_t i = 0, n = CoreCloud.size(); i < n; ++i)
+	{
+		DgmOctree::NeighboursSet NeighborsCloud;
+		CCVector3 NeighborsMaxEigVec = maxEigVecAt(CoreCloud[i].pointIndex);
+		size_t num_cluster = 0;
+
+		if (SearchType == 1)
+		{
+			DgmOctree::CylindricalNeighbourhood paramsNeighbors;
+			paramsNeighbors.center          = *CoreCloud[i].point;
+			paramsNeighbors.dir             = NeighborsMaxEigVec;
+			paramsNeighbors.radius          = radius;
+			paramsNeighbors.maxHalfLength   = 2 * radius;
+			paramsNeighbors.neighbours      = NeighborsCloud;
+			paramsNeighbors.level           = level;
+			paramsNeighbors.onlyPositiveDir = false;
+			num_cluster = octree->getPointsInCylindricalNeighbourhood(paramsNeighbors);
+			NeighborsCloud = paramsNeighbors.neighbours;
 		}
-		CoreCloud.erase(CoreCloud.begin() + indexCorePoint);
-
-		std::cout << "Start expand search" << std::endl;
-
-		for (size_t i = 0, n = CoreCloud.size(); i < n; ++i)
+		else if (SearchType == 2)
 		{
-			DgmOctree::NeighboursSet NeighborsCloud;
-			CCVector3 NeighborsMaxEigVec = IdentifyFracture::GetPointMaxEigVecFromSF(cloud, CoreCloud[i].pointIndex);
-			size_t num_cluster = 0;
+			num_cluster = octree->getPointsInSphericalNeighbourhood(*CoreCloud[i].point, radius, NeighborsCloud, level);
+		}
 
-			if (SearchType == 1)
+		if (num_cluster >= m_minPoints && std::abs(CoreMaxEigVec.dot(NeighborsMaxEigVec)) > c_minCosNormAngle)
+		{
+			for (auto iterNeighbors = NeighborsCloud.begin(); iterNeighbors != NeighborsCloud.end(); ++iterNeighbors)
 			{
-				DgmOctree::CylindricalNeighbourhood paramsNeighbors;
-				paramsNeighbors.center          = *CoreCloud[i].point;
-				paramsNeighbors.dir             = NeighborsMaxEigVec;
-				paramsNeighbors.radius          = radius;
-				paramsNeighbors.maxHalfLength   = 2 * radius;
-				paramsNeighbors.neighbours      = NeighborsCloud;
-				paramsNeighbors.level           = level;
-				paramsNeighbors.onlyPositiveDir = false;
-				num_cluster = octree->getPointsInCylindricalNeighbourhood(paramsNeighbors);
-				NeighborsCloud = paramsNeighbors.neighbours;
-			}
-			else if (SearchType == 2)
-			{
-				num_cluster = octree->getPointsInSphericalNeighbourhood(*CoreCloud[i].point, radius, NeighborsCloud, level);
-			}
-
-			pc->setCurrentScalarField(pc->getScalarFieldIndexByName("PC Linearity"));
-			pc->setCurrentScalarField(pc->getScalarFieldIndexByName("DBSCAN"));
-
-			if (num_cluster >= m_minPoints && std::abs(CoreMaxEigVec.dot(NeighborsMaxEigVec)) > c_minCosNormAngle)
-			{
-				DgmOctree::NeighboursSet::iterator iterNeighbors;
-
-				for (iterNeighbors = NeighborsCloud.begin(); iterNeighbors != NeighborsCloud.end(); ++iterNeighbors)
+				const ScalarType v = dbscanSF->getValue(iterNeighbors->pointIndex);
+				if (v == -1 || v == -2)
 				{
-					pc->setCurrentScalarField(pc->getScalarFieldIndexByName("DBSCAN"));
-
-					if (cloud->getPointScalarValue(iterNeighbors->pointIndex) == -1
-						|| cloud->getPointScalarValue(iterNeighbors->pointIndex) == -2)
+					if (v == -1)
 					{
-						if (cloud->getPointScalarValue(iterNeighbors->pointIndex) == -1)
-						{
-							CoreCloud.push_back(*iterNeighbors);
-							n = CoreCloud.size();
-						}
-						cloud->setPointScalarValue(iterNeighbors->pointIndex, static_cast<ScalarType>(clusterID));
+						CoreCloud.push_back(*iterNeighbors);
+						n = CoreCloud.size();
 					}
+					dbscanSF->setValue(iterNeighbors->pointIndex, static_cast<ScalarType>(clusterID));
 				}
 			}
 		}
-
-		return dbscan_SUCCESS;
 	}
+
+	return dbscan_SUCCESS;
 }
 
 
@@ -680,23 +708,18 @@ ccHObject* IdentifyFracture::createTraces(ccPointCloud* cloud,
 					facet->getContour()->setWidth(2);
 				}
 
-				//Trace Polyline
+				//Trace Polyline — endpoints at the extreme projections along the principal axis
 				CCVector3 ExtractFracture_MaxEigVec = IdentifyFracture::CalculateMaximumEigenVector(facetCloud).toFloat();
-				CCVector3 ExtractFracture_bbMin;
-				CCVector3 ExtractFracture_bbMax;
-				facetCloud->getBoundingBox(ExtractFracture_bbMin, ExtractFracture_bbMax);
-				float Fracture_HalfLength = 0.5f * static_cast<float>(std::sqrt(
-					std::pow(ExtractFracture_bbMax[0] - ExtractFracture_bbMin[0], 2)
-					+ std::pow(ExtractFracture_bbMax[1] - ExtractFracture_bbMin[1], 2)
-					+ std::pow(ExtractFracture_bbMax[2] - ExtractFracture_bbMin[2], 2)));
-				CCVector3 ExtractFracture_Center = (ExtractFracture_bbMax + ExtractFracture_bbMin) * 0.5f;
+				CCVector3 p0, p1;
+				IdentifyFracture::ComputeTraceEndpoints(facetCloud, ExtractFracture_MaxEigVec, p0, p1);
+
 				ccPointCloud* TipVertices = new ccPointCloud();
 				ccPolyline* newPoly = new ccPolyline(TipVertices);
 				newPoly->addChild(TipVertices);
 
 				TipVertices->reserve(2);
-				TipVertices->addPoint(ExtractFracture_Center + ExtractFracture_MaxEigVec * Fracture_HalfLength);
-				TipVertices->addPoint(ExtractFracture_Center - ExtractFracture_MaxEigVec * Fracture_HalfLength);
+				TipVertices->addPoint(p0);
+				TipVertices->addPoint(p1);
 
 				TipVertices->setEnabled(false);
 
@@ -738,7 +761,6 @@ ccHObject* IdentifyFracture::PlaneFitting(const ccHObject* ccGroup,
 	ccHObject* FitJointPlanes = new ccHObject("Fit Joint Planes");
 	unsigned FitPlaneIndex = 0;
 	unsigned totalnum = ccGroup->getChildrenNumber();
-	std::cout << "Start Plane Fitting, Planes number = " << int(totalnum) << std::endl;
 
 	if (progressCb)
 	{
@@ -808,24 +830,161 @@ ccHObject* IdentifyFracture::PlaneFitting(const ccHObject* ccGroup,
 }
 
 
-ScalarType IdentifyFracture::GetCloudLinearity(ReferenceCloud* cloud)
+ccHObject* IdentifyFracture::MergeCoplanarPlanes(const ccHObject* planesGroup,
+                                                 double maxNormalAngleDeg,
+                                                 double maxPlaneDist,
+                                                 unsigned maxPasses /*=1*/,
+                                                 GenericProgressCallback* progressCb /*=nullptr*/)
 {
-	Neighbourhood Z(cloud);
+	if (!planesGroup || maxPasses == 0)
+		return new ccHObject("Merged Joint Planes");
 
-	SquareMatrixd eigVectors;
-	std::vector<double> eigValues;
-	SquareMatrixd covarianceMatrix = Z.computeCovarianceMatrix();
+	ccHObject* current      = nullptr;           // result of the latest pass (owned)
+	const ccHObject* feed   = planesGroup;        // input for the next pass (not owned on first pass)
+	unsigned prevCount      = planesGroup->getChildrenNumber();
 
-	Jacobi<double>::ComputeEigenValuesAndVectors(covarianceMatrix, eigVectors, eigValues, true);
-	Jacobi<double>::SortEigenValuesAndVectors(eigVectors, eigValues);
+	for (unsigned pass = 0; pass < maxPasses; ++pass)
+	{
+		if (progressCb)
+			progressCb->setInfo(QString("Pass %1/%2…").arg(pass + 1).arg(maxPasses).toUtf8().constData());
 
-	const double a1 = eigValues[0];
-	const double a2 = eigValues[1];
+		ccHObject* next = MergeCoplanarPlanesOnce(feed, maxNormalAngleDeg, maxPlaneDist, progressCb);
+		const unsigned nextCount = next ? next->getChildrenNumber() : 0;
 
-	if (a1 == 0.0)
-		return NAN_VALUE;
+		// Delete the previous pass's owned output (if any) — we're replacing it.
+		if (current)
+			delete current;
+		current = next;
+		feed    = next;
 
-	return static_cast<ScalarType>((a1 - a2) / a1);
+		// Stop if nothing merged this pass, or nothing left to merge.
+		if (nextCount >= prevCount || nextCount <= 1)
+			break;
+		prevCount = nextCount;
+	}
+
+	if (!current)
+		current = new ccHObject("Merged Joint Planes");
+	return current;
+}
+
+
+ccHObject* IdentifyFracture::MergeCoplanarPlanesOnce(const ccHObject* planesGroup,
+                                                     double maxNormalAngleDeg,
+                                                     double maxPlaneDist,
+                                                     GenericProgressCallback* progressCb)
+{
+	struct PlaneInfo
+	{
+		const ccFacet* facet  = nullptr;
+		CCVector3      normal;
+		CCVector3      center;
+		bool           consumed = false;
+	};
+
+	std::vector<PlaneInfo> planes;
+	if (planesGroup)
+	{
+		const unsigned n = planesGroup->getChildrenNumber();
+		planes.reserve(n);
+		for (unsigned i = 0; i < n; ++i)
+		{
+			ccHObject* c = planesGroup->getChild(i);
+			if (!c || !c->isKindOf(CC_TYPES::FACET))
+				continue;
+			const ccFacet* f = static_cast<const ccFacet*>(c);
+			PlaneInfo pi;
+			pi.facet  = f;
+			pi.normal = f->getNormal();
+			pi.center = f->getCenter();
+			planes.push_back(pi);
+		}
+	}
+
+	ccHObject* merged = new ccHObject("Merged Joint Planes");
+
+	if (planes.empty())
+		return merged;
+
+	const double cosAngleThresh = cos(DegreesToRadians(maxNormalAngleDeg));
+	const unsigned totalPlanes  = static_cast<unsigned>(planes.size());
+
+	if (progressCb)
+	{
+		progressCb->setMethodTitle("Merge Coplanar Planes");
+		progressCb->setInfo(QString("Consolidating %1 facets…").arg(totalPlanes).toUtf8().constData());
+		progressCb->start();
+	}
+	NormalizedProgress nProgress(progressCb, std::max<unsigned>(totalPlanes, 1));
+
+	unsigned mergedIndex = 0;
+	while (true)
+	{
+		// Sequential-RANSAC style: among all unconsumed seeds, pick the one with
+		// the largest consensus set (peers whose center lies near seed's plane and
+		// whose normal is near-parallel to seed's normal).
+		int bestSeed = -1;
+		std::vector<int> bestGroup;
+		for (size_t i = 0; i < planes.size(); ++i)
+		{
+			if (planes[i].consumed) continue;
+			std::vector<int> group;
+			group.push_back(static_cast<int>(i));
+			for (size_t j = 0; j < planes.size(); ++j)
+			{
+				if (j == i || planes[j].consumed) continue;
+				if (std::abs(planes[i].normal.dot(planes[j].normal)) < cosAngleThresh) continue;
+				const double d = std::abs((planes[j].center - planes[i].center).dot(planes[i].normal));
+				if (d > maxPlaneDist) continue;
+				group.push_back(static_cast<int>(j));
+			}
+			if (group.size() > bestGroup.size())
+			{
+				bestGroup = std::move(group);
+				bestSeed  = static_cast<int>(i);
+			}
+		}
+		if (bestSeed < 0) break;
+
+		// Aggregate all points from members' origin points (fallback to the 4-endpoint
+		// corner cloud used by PlaneFitting, which lives in the facet's contour vertices).
+		ccPointCloud* agg = new ccPointCloud();
+		for (int idx : bestGroup)
+		{
+			const ccPointCloud* src = planes[idx].facet->getOriginPoints();
+			if (!src || src->size() == 0)
+				src = planes[idx].facet->getContourVertices();
+			if (!src) continue;
+			for (unsigned k = 0; k < src->size(); ++k)
+				agg->addPoint(*src->getPoint(k));
+		}
+
+		ccFacet* mergedFacet = nullptr;
+		if (agg->size() >= 3)
+			mergedFacet = ccFacet::Create(agg, 0, /*transferOwnership=*/true);
+		if (mergedFacet)
+		{
+			++mergedIndex;
+			mergedFacet->setName(QString("merged joint plane %1 (%2 sources)")
+				.arg(mergedIndex).arg(bestGroup.size()));
+			merged->addChild(mergedFacet);
+		}
+		else
+		{
+			delete agg;
+		}
+
+		for (int idx : bestGroup)
+		{
+			planes[idx].consumed = true;
+			nProgress.oneStep();
+		}
+	}
+
+	if (progressCb)
+		progressCb->stop();
+
+	return merged;
 }
 
 

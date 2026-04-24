@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>P21Dialog</class>
+ <widget class="QDialog" name="P21Dialog">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>520</width><height>420</height></rect>
+  </property>
+  <property name="windowTitle">
+   <string>qTracer — Compute P21 (trace intensity)</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QLabel" name="infoLabel">
+     <property name="text">
+      <string>P21 = (total trace length) / (outcrop surface area).
+Any group whose children contain 2-vertex polylines counts as a traces source — includes stage-3 [facets] and stage-4 Traces. Pick whichever matches your P21 convention.</string>
+     </property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+
+   <item>
+    <widget class="QGroupBox" name="inputsGroup">
+     <property name="title"><string>Inputs</string></property>
+     <layout class="QFormLayout">
+      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Traces source</string></property></widget></item>
+      <item row="0" column="1">
+       <widget class="QComboBox" name="tracesComboBox">
+        <property name="toolTip"><string>Any DB entity whose descendants include 2-vertex polylines (qTracer stage-3 [facets] or stage-4 Traces groups).</string></property>
+       </widget>
+      </item>
+
+      <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Area source (mesh)</string></property></widget></item>
+      <item row="1" column="1">
+       <widget class="QComboBox" name="areaComboBox">
+        <property name="toolTip"><string>Any ccMesh in the DB. Area is computed via the sum of triangle areas.</string></property>
+       </widget>
+      </item>
+
+      <item row="2" column="0" colspan="2">
+       <widget class="QCheckBox" name="manualAreaCheckBox">
+        <property name="text"><string>Override with manual area value:</string></property>
+        <property name="checked"><bool>false</bool></property>
+       </widget>
+      </item>
+      <item row="3" column="0"><widget class="QLabel"><property name="text"><string>Manual area</string></property></widget></item>
+      <item row="3" column="1">
+       <widget class="QDoubleSpinBox" name="manualAreaSpinBox">
+        <property name="enabled"><bool>false</bool></property>
+        <property name="decimals"><number>4</number></property>
+        <property name="minimum"><double>0.000010000000000</double></property>
+        <property name="maximum"><double>1000000000.000000000000000</double></property>
+        <property name="singleStep"><double>0.100000000000000</double></property>
+        <property name="value"><double>1.000000000000000</double></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <item>
+    <widget class="QGroupBox" name="resultsGroup">
+     <property name="title"><string>Results</string></property>
+     <property name="enabled"><bool>false</bool></property>
+     <layout class="QFormLayout">
+      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Polylines counted</string></property></widget></item>
+      <item row="0" column="1"><widget class="QLabel" name="tracesCountLabel"><property name="text"><string>—</string></property></widget></item>
+
+      <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Total trace length</string></property></widget></item>
+      <item row="1" column="1"><widget class="QLabel" name="totalLengthLabel"><property name="text"><string>—</string></property><property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property></widget></item>
+
+      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Total outcrop area</string></property></widget></item>
+      <item row="2" column="1"><widget class="QLabel" name="totalAreaLabel"><property name="text"><string>—</string></property><property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property></widget></item>
+
+      <item row="3" column="0">
+       <widget class="QLabel">
+        <property name="text"><string>P21 = L / A</string></property>
+        <property name="styleSheet"><string>font-weight: bold;</string></property>
+       </widget>
+      </item>
+      <item row="3" column="1">
+       <widget class="QLabel" name="p21Label">
+        <property name="text"><string>—</string></property>
+        <property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property>
+        <property name="styleSheet"><string>font-weight: bold;</string></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+
+   <item>
+    <layout class="QHBoxLayout">
+     <item>
+      <spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="computeButton">
+       <property name="text"><string>Compute</string></property>
+       <property name="default"><bool>true</bool></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="closeButton">
+       <property name="text"><string>Close</string></property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+</ui>

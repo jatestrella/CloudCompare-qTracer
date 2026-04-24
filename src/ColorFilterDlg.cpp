@@ -61,10 +61,15 @@ ColorFilterDlg::ColorFilterDlg(ccPointCloud* cloud, ccMainAppInterface* app, QWi
 	link(bSlider, bSpinBox, 100.0);
 	link(cSlider, cSpinBox, 100.0);
 
-	// When coefficients change, the histogram must be rebuilt.
+	// When coefficients change, the C range + histogram must be rebuilt.
+	// The spinbox signals cover typed input; the slider signals cover drag
+	// (where the spinbox valueChanged is suppressed by QSignalBlocker above).
 	connect(aSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &ColorFilterDlg::onCoefChanged);
 	connect(bSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &ColorFilterDlg::onCoefChanged);
 	connect(cSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &ColorFilterDlg::onCoefChanged);
+	connect(aSlider,  &QSlider::valueChanged,                                this, &ColorFilterDlg::onCoefChanged);
+	connect(bSlider,  &QSlider::valueChanged,                                this, &ColorFilterDlg::onCoefChanged);
+	connect(cSlider,  &QSlider::valueChanged,                                this, &ColorFilterDlg::onCoefChanged);
 
 	// C-threshold spinboxes drive preview and histogram cursors
 	connect(cMinSpinBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this,
@@ -101,6 +106,19 @@ ColorFilterDlg::ColorFilterDlg(ccPointCloud* cloud, ccMainAppInterface* app, QWi
 
 void ColorFilterDlg::onCoefChanged()
 {
+	// Theoretical max of C for the current a/b/c (each channel up to 255).
+	const double coefSum = aSpinBox->value() + bSpinBox->value() + cSpinBox->value();
+	const double newMax  = std::max(coefSum * 255.0, 1.0); // guard against coefSum == 0
+
+	// Clamp the threshold spinboxes if they sit above the new achievable max.
+	// The setValue calls propagate to the histogram cursors and fire preview.
+	if (cMaxSpinBox->value() > newMax) cMaxSpinBox->setValue(newMax);
+	if (cMinSpinBox->value() > newMax) cMinSpinBox->setValue(newMax);
+
+	// Update the histogram's x-range so the bins + cursors map into the new scale.
+	histogramWidget->setRange(0.0, newMax);
+
+	// Rebuild the histogram bins against the new C values.
 	m_histoTimer.start();
 }
 
@@ -115,8 +133,8 @@ void ColorFilterDlg::rebuildHistogram()
 	const double cCoef = cSpinBox->value();
 
 	constexpr int nBins = 128;
-	constexpr double xMin = 0.0;
-	constexpr double xMax = 765.0;
+	const double xMin = 0.0;
+	const double xMax = std::max((a + bCoef + cCoef) * 255.0, 1.0);
 	std::vector<unsigned> bins(nBins, 0);
 
 	const unsigned n = m_cloud->size();

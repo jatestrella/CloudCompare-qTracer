@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>OutcropAreaDialog</class>
+ <widget class="QDialog" name="OutcropAreaDialog">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>520</width><height>560</height></rect>
+  </property>
+  <property name="windowTitle">
+   <string>qTracer — Compute Outcrop Area</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QLabel" name="infoLabel">
+     <property name="text">
+      <string>Partition the cloud, fit a local plane per cell, intersect each plane with the cell's axis-aligned box, and sum the resulting polygon areas. Choose between a uniform octree or a planarity-driven kd-tree.</string>
+     </property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+
+   <item>
+    <layout class="QFormLayout">
+     <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Partitioner</string></property></widget></item>
+     <item row="0" column="1">
+      <widget class="QComboBox" name="partitionerComboBox">
+       <item><property name="text"><string>Octree (fixed cell size)</string></property></item>
+       <item><property name="text"><string>Kd-tree (adaptive, planarity-driven)</string></property></item>
+      </widget>
+     </item>
+    </layout>
+   </item>
+
+   <item>
+    <widget class="QStackedWidget" name="paramsStack">
+     <property name="currentIndex"><number>0</number></property>
+
+     <!-- Page 0: Octree params -->
+     <widget class="QWidget" name="octreePage">
+      <layout class="QVBoxLayout">
+       <item>
+        <widget class="QGroupBox" name="octreeParamsGroup">
+         <property name="title"><string>Octree parameters</string></property>
+         <layout class="QFormLayout">
+          <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Cell size</string></property></widget></item>
+          <item row="0" column="1">
+           <widget class="QDoubleSpinBox" name="cellSizeSpinBox">
+            <property name="toolTip"><string>Approximate cube side length (world units). Actual value is snapped to the nearest octree level.</string></property>
+            <property name="decimals"><number>4</number></property>
+            <property name="minimum"><double>0.000100000000000</double></property>
+            <property name="maximum"><double>10000.000000000000000</double></property>
+            <property name="singleStep"><double>0.010000000000000</double></property>
+            <property name="value"><double>0.100000000000000</double></property>
+           </widget>
+          </item>
+          <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Min points per cell</string></property></widget></item>
+          <item row="1" column="1">
+           <widget class="QSpinBox" name="minPointsSpinBox">
+            <property name="minimum"><number>3</number></property>
+            <property name="maximum"><number>1000000</number></property>
+            <property name="value"><number>10</number></property>
+           </widget>
+          </item>
+          <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Min planarity</string></property></widget></item>
+          <item row="2" column="1">
+           <widget class="QDoubleSpinBox" name="minPlanaritySpinBox">
+            <property name="toolTip"><string>Cells whose PCA planarity (λ2-λ3)/λ1 is below this threshold are skipped.</string></property>
+            <property name="decimals"><number>2</number></property>
+            <property name="minimum"><double>0.000000000000000</double></property>
+            <property name="maximum"><double>1.000000000000000</double></property>
+            <property name="singleStep"><double>0.050000000000000</double></property>
+            <property name="value"><double>0.300000000000000</double></property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+
+     <!-- Page 1: Kd-tree params -->
+     <widget class="QWidget" name="kdtreePage">
+      <layout class="QVBoxLayout">
+       <item>
+        <widget class="QGroupBox" name="kdtreeParamsGroup">
+         <property name="title"><string>Kd-tree parameters</string></property>
+         <layout class="QFormLayout">
+          <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Max error (RMS)</string></property></widget></item>
+          <item row="0" column="1">
+           <widget class="QDoubleSpinBox" name="maxErrorSpinBox">
+            <property name="toolTip"><string>Max per-leaf planar-fit RMS residual. Smaller = finer partitioning, more leaves.</string></property>
+            <property name="decimals"><number>5</number></property>
+            <property name="minimum"><double>0.000010000000000</double></property>
+            <property name="maximum"><double>10000.000000000000000</double></property>
+            <property name="singleStep"><double>0.001000000000000</double></property>
+            <property name="value"><double>0.010000000000000</double></property>
+           </widget>
+          </item>
+          <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Min points per leaf</string></property></widget></item>
+          <item row="1" column="1">
+           <widget class="QSpinBox" name="minPointsKdSpinBox">
+            <property name="toolTip"><string>Kd-tree never splits a cell below this. Also used to filter sparse leaves in the area sum.</string></property>
+            <property name="minimum"><number>3</number></property>
+            <property name="maximum"><number>1000000</number></property>
+            <property name="value"><number>10</number></property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+
+   <item>
+    <widget class="QCheckBox" name="addPatchMeshCheckBox">
+     <property name="text"><string>Add per-cell patch mesh to DB tree (for visual verification)</string></property>
+     <property name="checked"><bool>true</bool></property>
+    </widget>
+   </item>
+
+   <item>
+    <widget class="QGroupBox" name="resultsGroup">
+     <property name="title"><string>Results</string></property>
+     <property name="enabled"><bool>false</bool></property>
+     <layout class="QFormLayout">
+      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Total surface area</string></property></widget></item>
+      <item row="0" column="1"><widget class="QLabel" name="totalAreaLabel"><property name="text"><string>—</string></property><property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property></widget></item>
+
+      <item row="1" column="0"><widget class="QLabel" name="cellSizeReportLabel"><property name="text"><string>Actual cell size</string></property></widget></item>
+      <item row="1" column="1"><widget class="QLabel" name="actualCellSizeLabel"><property name="text"><string>—</string></property><property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property></widget></item>
+
+      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Valid cells</string></property></widget></item>
+      <item row="2" column="1"><widget class="QLabel" name="validCellsLabel"><property name="text"><string>—</string></property></widget></item>
+
+      <item row="3" column="0"><widget class="QLabel"><property name="text"><string>Rejected (too few points)</string></property></widget></item>
+      <item row="3" column="1"><widget class="QLabel" name="rejectedByCountLabel"><property name="text"><string>—</string></property></widget></item>
+
+      <item row="4" column="0"><widget class="QLabel" name="rejectedPlanarityCaption"><property name="text"><string>Rejected (low planarity)</string></property></widget></item>
+      <item row="4" column="1"><widget class="QLabel" name="rejectedByPlanarityLabel"><property name="text"><string>—</string></property></widget></item>
+
+      <item row="5" column="0"><widget class="QLabel"><property name="text"><string>Rejected (plane misses box)</string></property></widget></item>
+      <item row="5" column="1"><widget class="QLabel" name="rejectedDegenerateLabel"><property name="text"><string>—</string></property></widget></item>
+     </layout>
+    </widget>
+   </item>
+
+   <item>
+    <layout class="QHBoxLayout">
+     <item>
+      <spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="computeButton">
+       <property name="text"><string>Compute</string></property>
+       <property name="default"><bool>true</bool></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="closeButton">
+       <property name="text"><string>Close</string></property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+</ui>

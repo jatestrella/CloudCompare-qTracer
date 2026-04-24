@@ -31,7 +31,19 @@ public:
 private:
 	void doPipeline();
 	void doColorFilter();
+	void doOutcropArea();
+	void doP21();
+
+	void finalizePipelineResult(class ccHObject* root,
+	                            class ccPointCloud* pc,
+	                            class ccHObject* facetsGroup,
+	                            class ccHObject* tracesGroup,
+	                            class ccHObject* planesGroup,
+	                            class ccHObject* mergedGroup,
+	                            int firstStage);
 
 	QAction* m_action            = nullptr;
 	QAction* m_colorFilterAction = nullptr;
+	QAction* m_outcropAreaAction = nullptr;
+	QAction* m_p21Action         = nullptr;
 };
