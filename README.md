@@ -100,30 +100,17 @@ shows the result (trace length, area, and **P21 = L / A**) in place.
 
 ## Installation
 
-### Option A — Pre-built binary (recommended for users)
+The plugin must be ABI-compatible with your CloudCompare build, so the
+recommended path is to **build it from source against the same
+CloudCompare source/version you are running**. Pre-built binaries may
+be attached to the repo's [Releases] page from time to time; if so you
+can skip the build and copy them into CloudCompare's `plugins/` folder
+directly, but that only works when the binary was built against the
+exact CloudCompare version you use.
 
-1. Download the release archive for your platform:
-   - Windows: `qTracer-<version>-win64.zip` containing `qTracer.dll`
-   - Linux: `qTracer-<version>-linux64.tar.gz` containing `qTracer.so`
-   - macOS: `qTracer-<version>-macos.tar.gz` containing `qTracer.dylib`
-2. Locate your CloudCompare **plugins** folder:
-   - **Windows**: `<CloudCompare install>\plugins\`
-     (typically `C:\Program Files\CloudCompare\plugins\`)
-   - **Linux**: `<install prefix>/lib/cloudcompare/plugins/`
-   - **macOS**: inside the `.app` bundle — right-click CloudCompare.app
-     → *Show Package Contents* → `Contents/Plugins/ccPlugins/`
-3. Copy the plugin binary into that folder.
-4. Restart CloudCompare. The four qTracer actions should appear under
-   the **Plugins** menu.
+[Releases]: ../../releases
 
-> **Version note.** The plugin must be built against the **same
-> CloudCompare release** you intend to run it with. If you see
-> "plugin failed to load" in CloudCompare's console, the most common
-> cause is an ABI mismatch between the pre-built plugin and your
-> CloudCompare version — in that case rebuild from source against your
-> CloudCompare version (option B).
-
-### Option B — Build from source
+### Build from source
 
 Requires the CloudCompare source tree, a C++17 toolchain, and Qt 6.
 
@@ -132,9 +119,8 @@ Requires the CloudCompare source tree, a C++17 toolchain, and Qt 6.
    git clone https://github.com/CloudCompare/CloudCompare.git
    ```
 2. Place this plugin directory at
-   `<CloudCompare>/plugins/core/Standard/qTracer`. If you're working
-   against an upstream checkout that doesn't track this plugin, you can
-   add it as an ignored subdirectory or clone it alongside.
+   `<CloudCompare>/plugins/core/Standard/qTracer` (either clone it
+   there directly, or symlink / copy it into the CloudCompare tree).
 3. Configure the build with the plugin option enabled:
    ```bash
    cmake -S <CloudCompare> -B <build> \
@@ -147,13 +133,30 @@ Requires the CloudCompare source tree, a C++17 toolchain, and Qt 6.
    cmake --build   <build> --config Release --target qTracer
    cmake --install <build> --config Release --prefix <install>
    ```
-5. Run the CloudCompare executable from `<install>` — the qTracer
-   actions will be available.
+5. Run the CloudCompare executable from `<install>`. The four
+   qTracer actions will appear under the **Plugins** menu.
 
 Dependencies: **Qt 6** (`Core`, `Gui`, `Widgets`, `Svg`, `PrintSupport`)
 and **QCustomPlot** (vendored by CloudCompare at
 `qCC/extern/QCustomPlot`, linked automatically). No external geometry
 libraries required.
+
+### Installing a pre-built binary (if available)
+
+If a build for your platform is attached to a GitHub release:
+
+1. Download the plugin binary (`qTracer.dll` on Windows,
+   `qTracer.so` on Linux, `qTracer.dylib` on macOS).
+2. Locate CloudCompare's **plugins** folder:
+   - **Windows**: `<CloudCompare install>\plugins\`
+     (typically `C:\Program Files\CloudCompare\plugins\`)
+   - **Linux**: `<install prefix>/lib/cloudcompare/plugins/`
+   - **macOS**: inside the `.app` bundle — right-click
+     *CloudCompare.app* → *Show Package Contents* →
+     `Contents/Plugins/ccPlugins/`
+3. Copy the binary into that folder and restart CloudCompare.
+4. If you see "plugin failed to load", the binary and your
+   CloudCompare version are ABI-incompatible — rebuild from source.
 
 ---
 
@@ -196,7 +199,10 @@ libraries required.
 
 ## Authors
 
-- **Jate** — plugin author and maintainer.
+**Jate Chia-Chi Chiu** — plugin author and maintainer.
+Rock Lab, Institute of Mineral Resources Engineering,
+National Taipei University of Technology.
+Contact: <ccchiu@ntut.edu.tw>
 
 The extraction pipeline is based on an earlier DFN research prototype
 by the author; stages 1–5 are a faithful port with a few geometric and

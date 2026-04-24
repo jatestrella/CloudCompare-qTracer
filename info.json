@@ -2,12 +2,18 @@
 	"type" : "Standard",
 	"name" : "qTracer",
 	"icon" : ":/CC/plugin/qTracer/images/icon.png",
-	"description" : "DFN fracture trace extraction pipeline (Compute Eigen features → DBSCAN clustering → Create traces → Trace clustering → Plane fitting).",
+	"description" : "Extracts fracture traces from rock-outcrop point clouds (DBSCAN-based pipeline) and computes outcrop surface area + P21 fracture intensity.",
 	"authors" : [
-		{ "name" : "Jate" }
+		{
+			"name" : "Jate Chia-Chi Chiu",
+			"email" : "ccchiu@ntut.edu.tw"
+		}
 	],
 	"maintainers" : [
-		{ "name" : "Jate" }
+		{
+			"name" : "Jate Chia-Chi Chiu",
+			"email" : "ccchiu@ntut.edu.tw"
+		}
 	],
 	"references" : []
 }

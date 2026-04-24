@@ -26,7 +26,7 @@
 //Qt
 #include <QMainWindow>
 
-//! Dialog for displaying the BRGM disclaimer
+//! Disclaimer dialog shown the first time any qTracer action runs in a session.
 class DisclaimerDialog : public QDialog, public Ui::DisclaimerDialog
 {
 public:
@@ -36,6 +36,16 @@ public:
 		, Ui::DisclaimerDialog()
 	{
 		setupUi(this);
+
+		// The raw logo PNG can be much larger than the dialog's logo slot. Scale
+		// it here (keeping aspect ratio) so it sits nicely next to the text.
+		if (logo && !logo->pixmap().isNull())
+		{
+			constexpr int maxSide = 120;
+			logo->setPixmap(logo->pixmap().scaled(maxSide, maxSide,
+				Qt::KeepAspectRatio, Qt::SmoothTransformation));
+			logo->setScaledContents(false);
+		}
 	}
 };
 
