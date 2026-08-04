@@ -6,13 +6,13 @@
    <rect><x>0</x><y>0</y><width>560</width><height>380</height></rect>
   </property>
   <property name="windowTitle">
-   <string>qTracer — Color Filter</string>
+   <string>qTracer — Color Filtering</string>
   </property>
   <layout class="QVBoxLayout" name="mainLayout">
    <item>
     <widget class="QLabel" name="infoLabel">
      <property name="text">
-      <string>C = a·R + b·G + c·B    (a, b, c ∈ [0, 1])
+      <string>Color index    C = aR + bG + cB    (a, b, c ∈ [0, 1])
 Points are kept iff Cmin ≤ C ≤ Cmax. e.g. to filter by R alone: a=1, b=0, c=0.</string>
      </property>
      <property name="wordWrap"><bool>true</bool></property>
@@ -22,7 +22,7 @@ Points are kept iff Cmin ≤ C ≤ Cmax. e.g. to filter by R alone: a=1, b=0, c=
    <!-- Coefficients a, b, c (each 0..1) -->
    <item>
     <widget class="QGroupBox" name="coeffGroup">
-     <property name="title"><string>Coefficients  (0..1)</string></property>
+     <property name="title"><string>Weighting coefficients  a, b, c  (0..1)</string></property>
      <layout class="QGridLayout">
       <item row="0" column="0"><widget class="QLabel"><property name="text"><string>a (R weight)</string></property></widget></item>
       <item row="0" column="1"><widget class="QSlider" name="aSlider"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="minimum"><number>0</number></property><property name="maximum"><number>100</number></property><property name="value"><number>100</number></property></widget></item>

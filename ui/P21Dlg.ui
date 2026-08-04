@@ -6,7 +6,7 @@
    <rect><x>0</x><y>0</y><width>520</width><height>420</height></rect>
   </property>
   <property name="windowTitle">
-   <string>qTracer — Compute P21 (trace intensity)</string>
+   <string>qTracer — P21 Computation (areal fracture intensity)</string>
   </property>
   <layout class="QVBoxLayout" name="mainLayout">
    <item>

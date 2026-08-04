@@ -300,7 +300,7 @@ int IdentifyFracture::runDBSCAN(const DgmOctree* octree,
 
 	if (progressCb)
 	{
-		progressCb->setMethodTitle("DBSCAN");
+		progressCb->setMethodTitle("Cylindrical DBSCAN Clustering");
 		progressCb->setInfo(QString("Clustering %1 points…").arg(total).toUtf8().constData());
 		progressCb->start();
 	}
@@ -340,13 +340,34 @@ ccHObject* IdentifyFracture::TraceClustering(const ccHObject* ccGroup,
 {
 	const unsigned totalTraces = ccGroup->getChildrenNumber();
 
-	//build searching group
+	// Build the working set ("victim"): a 2-point cloud per trace, copied out
+	// of each facet's trace polyline. We **clone** the points (instead of
+	// re-parenting the original `TipVertices`) so the source `[facets]` group
+	// is left intact — otherwise re-running stage 4 on the same input crashes
+	// because the original `TipVertices` is gone the second time around.
 	ccHObject* victim = new ccHObject("victim");
 	for (unsigned i = 0; i < totalTraces; i++)
 	{
-		victim->addChild(ccGroup->getChild(i)->getChild(2)->getChild(0));
-		QString Name = QString("Trace %1").arg(i);
-		victim->getChild(i)->setName(Name);
+		const ccHObject* facet = ccGroup->getChild(i);
+		const ccHObject* poly  = (facet && facet->getChildrenNumber() > 2) ? facet->getChild(2) : nullptr;
+		const ccHObject* tips  = (poly && poly->getChildrenNumber() > 0) ? poly->getChild(0) : nullptr;
+		if (!tips || !tips->isKindOf(CC_TYPES::POINT_CLOUD))
+			continue;
+		const ccPointCloud* original = static_cast<const ccPointCloud*>(tips);
+		if (original->size() < 2)
+			continue;
+
+		ccPointCloud* clone = new ccPointCloud();
+		if (!clone->reserve(original->size()))
+		{
+			delete clone;
+			continue;
+		}
+		for (unsigned k = 0; k < original->size(); ++k)
+			clone->addPoint(*original->getPoint(k));
+
+		clone->setName(QString("Trace piece %1").arg(i));
+		victim->addChild(clone);
 	}
 
 	ccHObject* Traces = new ccHObject("Traces");
@@ -363,13 +384,13 @@ ccHObject* IdentifyFracture::TraceClustering(const ccHObject* ccGroup,
 
 	while (victim->getFirstChild())
 	{
-		ccHObject* DieGroup = new ccHObject("DisperseTraces");
+		ccHObject* DieGroup = new ccHObject("Trace pieces");
 		ccHObject* InfectedGroup = new ccHObject("InfestedGroup");
 
 		InfectedGroup->addChild(victim->getFirstChild());
 		victim->detachChild(victim->getFirstChild());
 
-		QString TraceName = QString("CombinedTrace %1").arg(tracenumber);
+		QString TraceName = QString("Merged trace %1").arg(tracenumber);
 		ccHObject* Trace = new ccHObject(TraceName);
 		tracenumber++;
 
@@ -559,7 +580,8 @@ int IdentifyFracture::expandCluster(const DgmOctree* octree,
 
 	if (CoreCloud_ref.size() < m_minPoints || Corelinearity < linearityThreshold)
 	{
-		CoreCloud_ref.forEach(IdentifyFracture::SetScalarValueToNOISE);
+		for (unsigned k = 0, n = CoreCloud_ref.size(); k < n; ++k)
+			CoreCloud_ref.setPointScalarValue(k, static_cast<ScalarType>(-2 /*NOISE*/));
 		return FAILURE;
 	}
 
@@ -629,7 +651,7 @@ ccHObject* IdentifyFracture::createTraces(ccPointCloud* cloud,
 	if (!cloud)
 		return nullptr;
 
-	ccHObject* ccGroup = new ccHObject(cloud->getName() + QString(" [facets]"));
+	ccHObject* ccGroup = new ccHObject(cloud->getName() + QString(" [trace pieces]"));
 	ccGroup->setDisplay(cloud->getDisplay());
 	ccGroup->setVisible(true);
 
@@ -638,8 +660,8 @@ ccHObject* IdentifyFracture::createTraces(ccPointCloud* cloud,
 	const unsigned totalComponents = static_cast<unsigned>(components.size());
 	if (progressCb)
 	{
-		progressCb->setMethodTitle("Create Traces");
-		progressCb->setInfo(QString("Building %1 facets…").arg(totalComponents).toUtf8().constData());
+		progressCb->setMethodTitle("Lineation");
+		progressCb->setInfo(QString("Building %1 trace pieces…").arg(totalComponents).toUtf8().constData());
 		progressCb->start();
 	}
 	NormalizedProgress nProgress(progressCb, std::max<unsigned>(totalComponents, 1));
@@ -660,7 +682,7 @@ ccHObject* IdentifyFracture::createTraces(ccPointCloud* cloud,
 			ccFacet* facet = ccFacet::Create(facetCloud, 0, true);
 			if (facet)
 			{
-				QString facetName = QString("Trace %1").arg(ccGroup->getChildrenNumber());
+				QString facetName = QString("Trace piece %1").arg(ccGroup->getChildrenNumber());
 				facet->setName(facetName);
 				if (facet->getPolygon())
 				{
@@ -758,7 +780,7 @@ ccHObject* IdentifyFracture::PlaneFitting(const ccHObject* ccGroup,
                                           double MinCorrDist,
                                           GenericProgressCallback* progressCb /*=nullptr*/)
 {
-	ccHObject* FitJointPlanes = new ccHObject("Fit Joint Planes");
+	ccHObject* FitJointPlanes = new ccHObject("Joint Planes");
 	unsigned FitPlaneIndex = 0;
 	unsigned totalnum = ccGroup->getChildrenNumber();
 
@@ -911,7 +933,7 @@ ccHObject* IdentifyFracture::MergeCoplanarPlanesOnce(const ccHObject* planesGrou
 
 	if (progressCb)
 	{
-		progressCb->setMethodTitle("Merge Coplanar Planes");
+		progressCb->setMethodTitle("Coplanar Plane Merging");
 		progressCb->setInfo(QString("Consolidating %1 facets…").arg(totalPlanes).toUtf8().constData());
 		progressCb->start();
 	}

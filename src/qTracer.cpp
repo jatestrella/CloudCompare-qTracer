@@ -67,23 +67,24 @@ QList<QAction*> qTracer::getActions()
 {
 	if (!m_colorFilterAction)
 	{
-		m_colorFilterAction = new QAction("Filter by Color…", this);
-		m_colorFilterAction->setToolTip("Interactive R/G/B and C=R+G+B threshold filter.\n"
+		m_colorFilterAction = new QAction("Color Filtering…", this);
+		m_colorFilterAction->setToolTip("Interactive threshold filter on the color index C = aR + bG + cB.\n"
 		                                "Produces a new point cloud that can be fed into the extraction pipeline.");
 		m_colorFilterAction->setIcon(QIcon(":/CC/plugin/qTracer/images/icon_colorfilter.svg"));
 		connect(m_colorFilterAction, &QAction::triggered, this, &qTracer::doColorFilter);
 	}
 	if (!m_action)
 	{
-		m_action = new QAction("Extract Fractures (Pipeline)", this);
+		m_action = new QAction("Fracture Extraction (Pipeline)", this);
 		m_action->setToolTip("Run the full pipeline on the selected point cloud:\n"
-		                     "Compute Eigen -> DBSCAN -> Create Traces -> Trace Clustering -> Plane Fitting");
-		m_action->setIcon(QIcon(":/CC/plugin/qTracer/images/icon_pipeline.svg"));
+		                     "Eigenvector Computing -> Cylindrical DBSCAN Clustering -> Lineation ->\n"
+		                     "Trace Clustering -> Plane Fitting -> Coplanar Plane Merging");
+		m_action->setIcon(QIcon(":/CC/plugin/qTracer/images/icon.svg"));
 		connect(m_action, &QAction::triggered, this, &qTracer::doPipeline);
 	}
 	if (!m_outcropAreaAction)
 	{
-		m_outcropAreaAction = new QAction("Compute Outcrop Area…", this);
+		m_outcropAreaAction = new QAction("Outcrop Area Computation…", this);
 		m_outcropAreaAction->setToolTip("Estimate the outcrop surface area by octree or kd-tree plane fits\n"
 		                                "(cell-by-cell plane-box intersection polygon sum).");
 		m_outcropAreaAction->setIcon(QIcon(":/CC/plugin/qTracer/images/icon_outcroparea.svg"));
@@ -91,8 +92,8 @@ QList<QAction*> qTracer::getActions()
 	}
 	if (!m_p21Action)
 	{
-		m_p21Action = new QAction("Compute P21…", this);
-		m_p21Action->setToolTip("Compute fracture intensity P21 = total trace length / outcrop surface area.\n"
+		m_p21Action = new QAction("P21 Computation…", this);
+		m_p21Action->setToolTip("Compute the areal fracture intensity P21 = total trace length / outcrop surface area.\n"
 		                        "Candidate trace groups and area meshes are auto-detected from the DB tree.");
 		m_p21Action->setIcon(QIcon(":/CC/plugin/qTracer/images/icon_p21.svg"));
 		connect(m_p21Action, &QAction::triggered, this, &qTracer::doP21);
@@ -340,11 +341,11 @@ void qTracer::doPipeline()
 	const bool runStage6 = firstStage <= 6 && lastStage >= 6;
 
 	// ---------------------------------------------------------------------
-	// Stage 1 : Compute Eigen Features
+	// Stage 1 : Eigenvector Computing
 	// ---------------------------------------------------------------------
 	if (runStage1)
 	{
-		announce(1, "Compute Eigen Features");
+		announce(1, "Eigenvector Computing");
 		IdentifyFracture::ErrorCode rc = IdentifyFracture::ComputeEigen(
 			pc,
 			static_cast<PointCoordinateType>(dlg.kernelRadius()),
@@ -364,7 +365,7 @@ void qTracer::doPipeline()
 	// ---------------------------------------------------------------------
 	if (runStage2)
 	{
-		announce(2, "DBSCAN");
+		announce(2, "Cylindrical DBSCAN Clustering");
 		IdentifyFracture::DBSCANParams params;
 		params.radius           = static_cast<PointCoordinateType>(dlg.dbscanRadius());
 		params.minPoints        = dlg.dbscanMinPoints();
@@ -403,11 +404,11 @@ void qTracer::doPipeline()
 	}
 
 	// ---------------------------------------------------------------------
-	// Stage 3 : Create Traces (facets)
+	// Stage 3 : Lineation (trace pieces)
 	// ---------------------------------------------------------------------
 	if (runStage3)
 	{
-		announce(3, "Create Traces");
+		announce(3, "Lineation");
 		int dbscanSFIdx = pc->getScalarFieldIndexByName("DBSCAN");
 		if (dbscanSFIdx < 0)
 		{
@@ -458,7 +459,7 @@ void qTracer::doPipeline()
 	{
 		if (!facetsGroup || facetsGroup->getChildrenNumber() == 0)
 		{
-			m_app->dispToConsole("[qTracer] Stage 4 needs a non-empty facets group. Aborted.",
+			m_app->dispToConsole("[qTracer] Stage 4 needs a non-empty trace-pieces group. Aborted.",
 			                     ccMainAppInterface::ERR_CONSOLE_MESSAGE);
 			finalizePipelineResult(root, pc, facetsGroup, tracesGroup, planesGroup, mergedGroup, firstStage);
 			return;
@@ -510,7 +511,7 @@ void qTracer::doPipeline()
 	}
 
 	// ---------------------------------------------------------------------
-	// Stage 6 : Merge Coplanar Planes (iterative)
+	// Stage 6 : Coplanar Plane Merging (iterative)
 	// ---------------------------------------------------------------------
 	if (runStage6)
 	{
@@ -521,7 +522,7 @@ void qTracer::doPipeline()
 			finalizePipelineResult(root, pc, facetsGroup, tracesGroup, planesGroup, mergedGroup, firstStage);
 			return;
 		}
-		announce(6, "Merge Coplanar Planes");
+		announce(6, "Coplanar Plane Merging");
 		mergedGroup = IdentifyFracture::MergeCoplanarPlanes(
 			planesGroup,
 			dlg.mergeMaxNormalAngleDeg(),
@@ -561,7 +562,7 @@ void qTracer::finalizePipelineResult(ccHObject* root,
 	}
 
 	m_app->dispToConsole(
-		QString("[qTracer] Pipeline done — %1 facets, %2 combined traces, %3 joint planes, %4 merged planes.")
+		QString("[qTracer] Pipeline done — %1 trace pieces, %2 merged traces, %3 joint planes, %4 merged planes.")
 			.arg(facetsGroup ? facetsGroup->getChildrenNumber() : 0)
 			.arg(tracesGroup ? tracesGroup->getChildrenNumber() : 0)
 			.arg(planesGroup ? planesGroup->getChildrenNumber() : 0)

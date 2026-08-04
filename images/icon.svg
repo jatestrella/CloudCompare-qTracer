@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- DFN: two sub-parallel fracture sets + one accent cross-cutter -->
+  <g stroke="#3d2f1e" stroke-width="1.7" stroke-linecap="round" fill="none">
+    <!-- Set A: NW->SE -->
+    <line x1="3"  y1="8"  x2="28" y2="21"/>
+    <line x1="16" y1="3"  x2="29" y2="11"/>
+    <line x1="8"  y1="18" x2="22" y2="25"/>
+    <!-- Set B: NE->SW (secondary) -->
+    <line x1="22" y1="12" x2="15" y2="24"/>
+  </g>
+  <!-- Accent: main cross-cutting trace -->
+  <line x1="25" y1="3" x2="10" y2="28"
+        stroke="#b22" stroke-width="2.0" stroke-linecap="round"/>
+</svg>

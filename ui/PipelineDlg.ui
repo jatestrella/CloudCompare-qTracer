@@ -13,24 +13,25 @@
     <widget class="QLabel" name="infoLabel">
      <property name="text">
       <string>Runs the full pipeline in one go:
-Compute Eigen → DBSCAN → Create Traces → Trace Clustering → Plane Fitting.
+Eigenvector Computing → Cylindrical DBSCAN Clustering → Lineation → Trace Clustering → Plane Fitting → Coplanar Plane Merging.
 Intermediate and final groups are added to the DB tree.</string>
      </property>
      <property name="wordWrap"><bool>true</bool></property>
     </widget>
    </item>
 
-   <!-- Stage 1 : Compute Eigen -->
+   <!-- Stage 1 : Eigenvector Computing -->
    <item>
     <widget class="QGroupBox" name="eigenGroup">
-     <property name="title"><string>1. Compute Eigen Features</string></property>
+     <property name="title"><string>1. Eigenvector Computing</string></property>
      <property name="checkable"><bool>true</bool></property>
      <property name="checked"><bool>true</bool></property>
      <layout class="QFormLayout" name="eigenForm">
-      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Kernel radius</string></property></widget></item>
+      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Kernel radius (r_k)</string></property></widget></item>
       <item row="0" column="1">
        <widget class="QDoubleSpinBox" name="kernelRadiusSpinBox">
-        <property name="toolTip"><string>Neighbourhood sphere radius for per-point feature computation</string></property>
+        <property name="toolTip"><string>Radius of the spherical kernel used to build the local covariance matrix A = XᵀX.
+Outputs per point: eigenvalues λ₁ ≥ λ₂ ≥ λ₃, principal eigenvector v₁, and linearity L = (λ₁ − λ₂) / λ₁.</string></property>
         <property name="decimals"><number>4</number></property>
         <property name="minimum"><double>0.000100000000000</double></property>
         <property name="maximum"><double>10000.000000000000000</double></property>
@@ -42,16 +43,17 @@ Intermediate and final groups are added to the DB tree.</string>
     </widget>
    </item>
 
-   <!-- Stage 2 : DBSCAN -->
+   <!-- Stage 2 : Cylindrical DBSCAN Clustering -->
    <item>
     <widget class="QGroupBox" name="dbscanGroup">
-     <property name="title"><string>2. DBSCAN Clustering</string></property>
+     <property name="title"><string>2. Cylindrical DBSCAN Clustering</string></property>
      <property name="checkable"><bool>true</bool></property>
      <property name="checked"><bool>true</bool></property>
      <layout class="QFormLayout" name="dbscanForm">
-      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Neighbourhood radius</string></property></widget></item>
+      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Search radius (R)</string></property></widget></item>
       <item row="0" column="1">
        <widget class="QDoubleSpinBox" name="dbscanRadiusSpinBox">
+        <property name="toolTip"><string>DBSCAN search radius R. Also the radius of the cylindrical neighbourhood.</string></property>
         <property name="decimals"><number>4</number></property>
         <property name="minimum"><double>0.000100000000000</double></property>
         <property name="maximum"><double>10000.000000000000000</double></property>
@@ -59,17 +61,19 @@ Intermediate and final groups are added to the DB tree.</string>
         <property name="value"><double>0.030000000000000</double></property>
        </widget>
       </item>
-      <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Min neighbours</string></property></widget></item>
+      <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Minimum points (minPts)</string></property></widget></item>
       <item row="1" column="1">
        <widget class="QSpinBox" name="dbscanMinPointsSpinBox">
+        <property name="toolTip"><string>Minimum number of neighbours inside the search volume for a point to become a core point.</string></property>
         <property name="minimum"><number>1</number></property>
         <property name="maximum"><number>1000000</number></property>
         <property name="value"><number>50</number></property>
        </widget>
       </item>
-      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Max angle (deg)</string></property></widget></item>
+      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Max eigenvector angle θ_db (deg)</string></property></widget></item>
       <item row="2" column="1">
        <widget class="QDoubleSpinBox" name="dbscanMaxAngleSpinBox">
+        <property name="toolTip"><string>Max angle θ_db between the principal eigenvector v₁ of a candidate core point and that of the cluster seed point.</string></property>
         <property name="decimals"><number>2</number></property>
         <property name="minimum"><double>0.000000000000000</double></property>
         <property name="maximum"><double>90.000000000000000</double></property>
@@ -77,9 +81,11 @@ Intermediate and final groups are added to the DB tree.</string>
         <property name="value"><double>15.000000000000000</double></property>
        </widget>
       </item>
-      <item row="3" column="0"><widget class="QLabel"><property name="text"><string>Linearity threshold</string></property></widget></item>
+      <item row="3" column="0"><widget class="QLabel"><property name="text"><string>Linearity threshold (L)</string></property></widget></item>
       <item row="3" column="1">
        <widget class="QDoubleSpinBox" name="dbscanLinearitySpinBox">
+        <property name="toolTip"><string>Pre-filter on the linearity index L = (λ₁ − λ₂) / λ₁ from stage 1.
+Only points with L above this value are passed to the clustering.</string></property>
         <property name="decimals"><number>3</number></property>
         <property name="minimum"><double>0.000000000000000</double></property>
         <property name="maximum"><double>1.000000000000000</double></property>
@@ -90,24 +96,27 @@ Intermediate and final groups are added to the DB tree.</string>
       <item row="4" column="0"><widget class="QLabel"><property name="text"><string>Search neighbourhood</string></property></widget></item>
       <item row="4" column="1">
        <widget class="QComboBox" name="dbscanSearchTypeComboBox">
-        <item><property name="text"><string>Cylinder (along MaxEigVec)</string></property></item>
-        <item><property name="text"><string>Sphere</string></property></item>
+        <property name="toolTip"><string>Cylinder: axis along the principal eigenvector v₁, radius R, half-length h = 2R (total length 4R).
+Sphere: classical DBSCAN neighbourhood of radius R.</string></property>
+        <item><property name="text"><string>Cylinder (along v₁, h = 2R)</string></property></item>
+        <item><property name="text"><string>Sphere (classical)</string></property></item>
        </widget>
       </item>
      </layout>
     </widget>
    </item>
 
-   <!-- Stage 3 : Create Traces -->
+   <!-- Stage 3 : Lineation -->
    <item>
     <widget class="QGroupBox" name="tracesGroup">
-     <property name="title"><string>3. Create Traces (Facets)</string></property>
+     <property name="title"><string>3. Lineation</string></property>
+     <property name="toolTip"><string>Simplifies each cluster into one straight segment: midpoint = cluster centroid, direction = v₁, endpoints = the extreme projections of the cluster points onto v₁.</string></property>
      <property name="checkable"><bool>true</bool></property>
      <property name="checked"><bool>true</bool></property>
      <layout class="QVBoxLayout" name="tracesLayout">
       <item>
        <widget class="QCheckBox" name="randomColorsCheckBox">
-        <property name="text"><string>Random facet colors (else: color by dip / dip-dir)</string></property>
+        <property name="text"><string>Random colors (else: color by dip / dip direction)</string></property>
         <property name="checked"><bool>false</bool></property>
        </widget>
       </item>
@@ -122,9 +131,11 @@ Intermediate and final groups are added to the DB tree.</string>
      <property name="checkable"><bool>true</bool></property>
      <property name="checked"><bool>true</bool></property>
      <layout class="QFormLayout" name="clusteringForm">
-      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Cone radius</string></property></widget></item>
+      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Collinearity radius (r_c)</string></property></widget></item>
       <item row="0" column="1">
        <widget class="QDoubleSpinBox" name="coneRadiusSpinBox">
+        <property name="toolTip"><string>Radius of the cylinder around a trace's infinite line.
+Two pieces are collinear when each has an end point inside the other's cylinder.</string></property>
         <property name="decimals"><number>4</number></property>
         <property name="minimum"><double>0.000100000000000</double></property>
         <property name="maximum"><double>10000.000000000000000</double></property>
@@ -132,9 +143,10 @@ Intermediate and final groups are added to the DB tree.</string>
         <property name="value"><double>0.100000000000000</double></property>
        </widget>
       </item>
-      <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Two-trace distance</string></property></widget></item>
+      <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Max gap (g_max)</string></property></widget></item>
       <item row="1" column="1">
        <widget class="QDoubleSpinBox" name="twoTraceDistSpinBox">
+        <property name="toolTip"><string>Largest end-to-end gap that may still be bridged between two trace pieces.</string></property>
         <property name="decimals"><number>4</number></property>
         <property name="minimum"><double>0.000100000000000</double></property>
         <property name="maximum"><double>10000.000000000000000</double></property>
@@ -142,9 +154,11 @@ Intermediate and final groups are added to the DB tree.</string>
         <property name="value"><double>0.500000000000000</double></property>
        </widget>
       </item>
-      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Min angle (deg)</string></property></widget></item>
+      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Max direction deviation Δθ_max (deg)</string></property></widget></item>
       <item row="2" column="1">
        <widget class="QDoubleSpinBox" name="clusterMinAngleSpinBox">
+        <property name="toolTip"><string>Two pieces are merged only when their directions differ by at most this angle.
+Note: this is an upper bound (θ ≤ Δθ_max) — the opposite sense of the threshold angle in stage 5.</string></property>
         <property name="decimals"><number>2</number></property>
         <property name="minimum"><double>0.000000000000000</double></property>
         <property name="maximum"><double>90.000000000000000</double></property>
@@ -163,9 +177,11 @@ Intermediate and final groups are added to the DB tree.</string>
      <property name="checkable"><bool>true</bool></property>
      <property name="checked"><bool>true</bool></property>
      <layout class="QFormLayout" name="planeForm">
-      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Intersection-line distance</string></property></widget></item>
+      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Threshold distance (d_th)</string></property></widget></item>
       <item row="0" column="1">
        <widget class="QDoubleSpinBox" name="planeIntersectionDistSpinBox">
+        <property name="toolTip"><string>Max shortest distance d_ij between the two trace lines (common-perpendicular distance).
+Pairs with d_ij ≥ d_th are treated as parallel or as not belonging to the same joint plane.</string></property>
         <property name="decimals"><number>4</number></property>
         <property name="minimum"><double>0.000100000000000</double></property>
         <property name="maximum"><double>10000.000000000000000</double></property>
@@ -173,9 +189,10 @@ Intermediate and final groups are added to the DB tree.</string>
         <property name="value"><double>0.100000000000000</double></property>
        </widget>
       </item>
-      <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Min trace length</string></property></widget></item>
+      <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Threshold length (L_th)</string></property></widget></item>
       <item row="1" column="1">
        <widget class="QDoubleSpinBox" name="planeMinTraceLenSpinBox">
+        <property name="toolTip"><string>Both traces of a pair must be longer than L_th, to avoid misjudgment caused by small traces.</string></property>
         <property name="decimals"><number>4</number></property>
         <property name="minimum"><double>0.000000000000000</double></property>
         <property name="maximum"><double>10000.000000000000000</double></property>
@@ -183,9 +200,11 @@ Intermediate and final groups are added to the DB tree.</string>
         <property name="value"><double>0.010000000000000</double></property>
        </widget>
       </item>
-      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Min intersection angle (deg)</string></property></widget></item>
+      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Threshold angle θ_th (deg)</string></property></widget></item>
       <item row="2" column="1">
        <widget class="QDoubleSpinBox" name="planeMinAngleSpinBox">
+        <property name="toolTip"><string>The angle θ_ij = arccos(|u_i · u_j|) between the two traces must exceed θ_th,
+so that two near-parallel traces are not fitted into a joint plane.</string></property>
         <property name="decimals"><number>2</number></property>
         <property name="minimum"><double>0.000000000000000</double></property>
         <property name="maximum"><double>90.000000000000000</double></property>
@@ -193,9 +212,11 @@ Intermediate and final groups are added to the DB tree.</string>
         <property name="value"><double>30.000000000000000</double></property>
        </widget>
       </item>
-      <item row="3" column="0"><widget class="QLabel"><property name="text"><string>Max end-point distance</string></property></widget></item>
+      <item row="3" column="0"><widget class="QLabel"><property name="text"><string>Max end-point distance (e_th)</string></property></widget></item>
       <item row="3" column="1">
        <widget class="QDoubleSpinBox" name="planeMaxEndPointDistSpinBox">
+        <property name="toolTip"><string>At least one of the four cross end-point distances (P_i-P_j, P_i-Q_j, Q_i-P_j, Q_i-Q_j) must be below this value,
+so that the two traces are also close in space, not merely coplanar as infinite lines.</string></property>
         <property name="decimals"><number>4</number></property>
         <property name="minimum"><double>0.000100000000000</double></property>
         <property name="maximum"><double>10000.000000000000000</double></property>
@@ -207,17 +228,18 @@ Intermediate and final groups are added to the DB tree.</string>
     </widget>
    </item>
 
-   <!-- Stage 6 : Merge Coplanar Planes -->
+   <!-- Stage 6 : Coplanar Plane Merging -->
    <item>
     <widget class="QGroupBox" name="mergeGroup">
-     <property name="title"><string>6. Merge Coplanar Planes</string></property>
+     <property name="title"><string>6. Coplanar Plane Merging</string></property>
      <property name="checkable"><bool>true</bool></property>
      <property name="checked"><bool>true</bool></property>
      <layout class="QFormLayout" name="mergeForm">
-      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Max normal angle (deg)</string></property></widget></item>
+      <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Max normal angle α_max (deg)</string></property></widget></item>
       <item row="0" column="1">
        <widget class="QDoubleSpinBox" name="mergeMaxNormalAngleSpinBox">
-        <property name="toolTip"><string>Two planes whose normals differ by more than this angle will NOT be merged.</string></property>
+        <property name="toolTip"><string>Coplanarity test |N_i · N_j| ≥ cos α_max.
+Two facets whose normals differ by more than α_max will NOT be merged.</string></property>
         <property name="decimals"><number>2</number></property>
         <property name="minimum"><double>0.000000000000000</double></property>
         <property name="maximum"><double>90.000000000000000</double></property>
@@ -225,10 +247,11 @@ Intermediate and final groups are added to the DB tree.</string>
         <property name="value"><double>10.000000000000000</double></property>
        </widget>
       </item>
-      <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Max plane distance</string></property></widget></item>
+      <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Max plane offset (δ_max)</string></property></widget></item>
       <item row="1" column="1">
        <widget class="QDoubleSpinBox" name="mergeMaxPlaneDistSpinBox">
-        <property name="toolTip"><string>Max perpendicular distance from a peer plane's center to the seed plane.</string></property>
+        <property name="toolTip"><string>Coplanarity test |(c_j − c_i) · N_i| ≤ δ_max.
+Max perpendicular offset of a candidate centroid from the seed plane.</string></property>
         <property name="decimals"><number>4</number></property>
         <property name="minimum"><double>0.000100000000000</double></property>
         <property name="maximum"><double>10000.000000000000000</double></property>
