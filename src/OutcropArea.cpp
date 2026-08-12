@@ -11,11 +11,14 @@
 //qCC_db
 #include <ccKdTree.h>
 #include <ccMesh.h>
+#include <ccNormalVectors.h>
 
 //system
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
+#include <unordered_set>
 #include <vector>
 
 using namespace CCCoreLib;
@@ -480,6 +483,180 @@ bool computeKdTree(ccPointCloud* cloud,
 	return true;
 }
 
+//! 2D convex-hull area (Andrew's monotone chain + shoelace). Mutates \p pts (sorts it).
+double convexHullArea2D(std::vector<std::pair<double, double>>& pts)
+{
+	const size_t n = pts.size();
+	if (n < 3) return 0.0;
+	std::sort(pts.begin(), pts.end());
+
+	auto cross = [](const std::pair<double, double>& O,
+	                const std::pair<double, double>& A,
+	                const std::pair<double, double>& B)
+	{
+		return (A.first - O.first) * (B.second - O.second)
+		     - (A.second - O.second) * (B.first - O.first);
+	};
+
+	std::vector<std::pair<double, double>> h(2 * n);
+	int k = 0;
+	for (size_t i = 0; i < n; ++i)
+	{
+		while (k >= 2 && cross(h[k - 2], h[k - 1], pts[i]) <= 0.0) --k;
+		h[k++] = pts[i];
+	}
+	const int lower = k + 1;
+	for (size_t i = n - 1; i-- > 0; )
+	{
+		while (k >= lower && cross(h[k - 2], h[k - 1], pts[i]) <= 0.0) --k;
+		h[k++] = pts[i];
+	}
+	h.resize(static_cast<size_t>(k - 1));
+
+	double a = 0.0;
+	for (size_t i = 0, m = h.size(); i < m; ++i)
+	{
+		const auto& A = h[i];
+		const auto& B = h[(i + 1) % m];
+		a += A.first * B.second - B.first * A.second;
+	}
+	return std::abs(a) * 0.5;
+}
+
+//! Projected path — single best-fit plane + 2D grid-occupancy footprint area.
+/** Denominator for P21 on a quasi-planar outcrop: convergent, planar, and
+ *  measured on the same plane as the (near-planar) traces. */
+bool computeProjected(ccPointCloud* cloud,
+                      const OutcropArea::Params& p,
+                      OutcropArea::Result& result,
+                      GenericProgressCallback* progressCb)
+{
+	const unsigned N = cloud->size();
+	if (N < 3 || p.projGridSize <= 0.0) return false;
+
+	if (progressCb)
+	{
+		progressCb->setMethodTitle("Outcrop area (projected)");
+		progressCb->setInfo("Fitting best-fit plane…");
+		progressCb->start();
+	}
+
+	// --- best-fit plane via PCA on a strided subsample (speed) ---
+	const unsigned stride = std::max<unsigned>(1, N / 200000u);
+	ReferenceCloud rc(cloud);
+	if (!rc.reserve(N / stride + 1)) return false;
+	for (unsigned i = 0; i < N; i += stride) rc.addPointIndex(i);
+
+	Neighbourhood nb(&rc);
+	SquareMatrixd cov = nb.computeCovarianceMatrix();
+	const CCVector3* Gptr = nb.getGravityCenter();
+	if (!Gptr) return false;
+	const CCVector3 c = *Gptr;
+
+	SquareMatrixd eigVectors;
+	std::vector<double> eigValues;
+	if (!Jacobi<double>::ComputeEigenValuesAndVectors(cov, eigVectors, eigValues, true))
+		return false;
+	Jacobi<double>::SortEigenValuesAndVectors(eigVectors, eigValues);
+
+	CCVector3d uD, vD, nD;
+	Jacobi<double>::GetEigenVector(eigVectors, 0, uD.u); // largest  -> in-plane u
+	Jacobi<double>::GetEigenVector(eigVectors, 1, vD.u); // middle   -> in-plane v
+	Jacobi<double>::GetEigenVector(eigVectors, 2, nD.u); // smallest -> plane normal
+	if (nD.z < 0) nD = -nD;                               // consistent "up" normal
+	uD.normalize(); vD.normalize(); nD.normalize();
+
+	const CCVector3 u(  static_cast<PointCoordinateType>(uD.x),
+	                    static_cast<PointCoordinateType>(uD.y),
+	                    static_cast<PointCoordinateType>(uD.z));
+	const CCVector3 v(  static_cast<PointCoordinateType>(vD.x),
+	                    static_cast<PointCoordinateType>(vD.y),
+	                    static_cast<PointCoordinateType>(vD.z));
+	const CCVector3 nrm(static_cast<PointCoordinateType>(nD.x),
+	                    static_cast<PointCoordinateType>(nD.y),
+	                    static_cast<PointCoordinateType>(nD.z));
+
+	// --- single pass: project every point, count occupied grid cells ---
+	if (progressCb)
+		progressCb->setInfo(QString("Projecting %1 points…").arg(N).toUtf8().constData());
+
+	std::unordered_set<uint64_t> occ;
+	occ.reserve(1u << 16);
+	double sumW2 = 0.0;
+	double uMin =  std::numeric_limits<double>::max(), uMax = -std::numeric_limits<double>::max();
+	double vMin =  std::numeric_limits<double>::max(), vMax = -std::numeric_limits<double>::max();
+	const double cell = p.projGridSize;
+
+	for (unsigned i = 0; i < N; ++i)
+	{
+		CCVector3 P;
+		cloud->getPoint(i, P);
+		const CCVector3 d = P - c;
+		const double pu = static_cast<double>(d.dot(u));
+		const double pv = static_cast<double>(d.dot(v));
+		const double pw = static_cast<double>(d.dot(nrm));
+		sumW2 += pw * pw;
+		uMin = std::min(uMin, pu); uMax = std::max(uMax, pu);
+		vMin = std::min(vMin, pv); vMax = std::max(vMax, pv);
+		const int32_t iu = static_cast<int32_t>(std::floor(pu / cell));
+		const int32_t iv = static_cast<int32_t>(std::floor(pv / cell));
+		const uint64_t key = (static_cast<uint64_t>(static_cast<uint32_t>(iu)) << 32)
+		                    |  static_cast<uint64_t>(static_cast<uint32_t>(iv));
+		occ.insert(key);
+	}
+
+	result.totalArea         = static_cast<double>(occ.size()) * cell * cell;
+	result.validCells        = static_cast<unsigned>(occ.size());
+	result.totalCellsAtLevel = static_cast<unsigned>(occ.size());
+	result.actualCellSize    = cell;
+	result.planeRMS          = std::sqrt(sumW2 / static_cast<double>(N));
+	result.inPlaneSizeU      = uMax - uMin;
+	result.inPlaneSizeV      = vMax - vMin;
+
+	PointCoordinateType dip = 0, dipDir = 0;
+	ccNormalVectors::ConvertNormalToDipAndDipDir(nrm, dip, dipDir);
+	result.planeDip    = static_cast<double>(dip);
+	result.planeDipDir = static_cast<double>(dipDir);
+
+	// --- convex hull on occupied cell centers (reference / upper bound) ---
+	std::vector<std::pair<double, double>> centers;
+	centers.reserve(occ.size());
+	for (uint64_t key : occ)
+	{
+		const int32_t iu = static_cast<int32_t>(key >> 32);
+		const int32_t iv = static_cast<int32_t>(key & 0xFFFFFFFFu);
+		centers.emplace_back((static_cast<double>(iu) + 0.5) * cell,
+		                     (static_cast<double>(iv) + 0.5) * cell);
+	}
+	result.convexHullArea = convexHullArea2D(centers);
+
+	// --- optional footprint mesh: one quad per occupied cell, laid on the plane ---
+	if (p.buildPatchMesh && occ.size() <= 400000)
+	{
+		Context ctx;
+		ensurePatchMesh(ctx, true);
+		for (uint64_t key : occ)
+		{
+			const int32_t iu = static_cast<int32_t>(key >> 32);
+			const int32_t iv = static_cast<int32_t>(key & 0xFFFFFFFFu);
+			const double u0 = static_cast<double>(iu) * cell, u1 = u0 + cell;
+			const double v0 = static_cast<double>(iv) * cell, v1 = v0 + cell;
+			auto onPlane = [&](double uu, double vv) -> CCVector3 {
+				return c + u * static_cast<PointCoordinateType>(uu)
+				         + v * static_cast<PointCoordinateType>(vv);
+			};
+			const std::vector<CCVector3> quad = {
+				onPlane(u0, v0), onPlane(u1, v0), onPlane(u1, v1), onPlane(u0, v1) };
+			appendPolyToMesh(ctx, quad);
+		}
+		result.mesh         = ctx.mesh;
+		result.meshVertices = ctx.meshVertices;
+	}
+
+	if (progressCb) progressCb->stop();
+	return true;
+}
+
 } // anonymous namespace
 
 
@@ -494,8 +671,9 @@ bool OutcropArea::Compute(ccPointCloud* cloud,
 
 	switch (params.partitioner)
 	{
-		case Octree: return computeOctree(cloud, params, result, progressCb);
-		case KdTree: return computeKdTree(cloud, params, result, progressCb);
+		case Octree:    return computeOctree(cloud, params, result, progressCb);
+		case KdTree:    return computeKdTree(cloud, params, result, progressCb);
+		case Projected: return computeProjected(cloud, params, result, progressCb);
 	}
 	return false;
 }

@@ -12,7 +12,7 @@
    <item>
     <widget class="QLabel" name="infoLabel">
      <property name="text">
-      <string>Partition the cloud, fit a local plane per cell, intersect each plane with the cell's axis-aligned box, and sum the resulting polygon areas. Choose between a uniform octree or a planarity-driven kd-tree.</string>
+      <string>Estimate the outcrop sampling area (the P21 denominator). Octree / Kd-tree sum local plane-box patches (a 3D rugose surface area, resolution-dependent). Projected fits one best-fit plane and measures the footprint by 2D grid occupancy (a convergent planar area — recommended for P21 on a quasi-planar outcrop).</string>
      </property>
      <property name="wordWrap"><bool>true</bool></property>
     </widget>
@@ -25,6 +25,7 @@
       <widget class="QComboBox" name="partitionerComboBox">
        <item><property name="text"><string>Octree (fixed cell size)</string></property></item>
        <item><property name="text"><string>Kd-tree (adaptive, planarity-driven)</string></property></item>
+       <item><property name="text"><string>Projected (best-fit plane, 2D occupancy)</string></property></item>
       </widget>
      </item>
     </layout>
@@ -109,6 +110,30 @@
        </item>
       </layout>
      </widget>
+
+     <!-- Page 2: Projected params -->
+     <widget class="QWidget" name="projectedPage">
+      <layout class="QVBoxLayout">
+       <item>
+        <widget class="QGroupBox" name="projectedParamsGroup">
+         <property name="title"><string>Projected parameters (best-fit plane)</string></property>
+         <layout class="QFormLayout">
+          <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Grid cell size</string></property></widget></item>
+          <item row="0" column="1">
+           <widget class="QDoubleSpinBox" name="projGridSizeSpinBox">
+            <property name="toolTip"><string>In-plane grid cell side. Area = (occupied cells) × cell². Pick well above the point spacing and well below the outcrop size (convergence sweet spot; e.g. 0.02 m).</string></property>
+            <property name="decimals"><number>4</number></property>
+            <property name="minimum"><double>0.000100000000000</double></property>
+            <property name="maximum"><double>10000.000000000000000</double></property>
+            <property name="singleStep"><double>0.010000000000000</double></property>
+            <property name="value"><double>0.020000000000000</double></property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
     </widget>
    </item>
 
@@ -130,17 +155,17 @@
       <item row="1" column="0"><widget class="QLabel" name="cellSizeReportLabel"><property name="text"><string>Actual cell size</string></property></widget></item>
       <item row="1" column="1"><widget class="QLabel" name="actualCellSizeLabel"><property name="text"><string>—</string></property><property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property></widget></item>
 
-      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Valid cells</string></property></widget></item>
-      <item row="2" column="1"><widget class="QLabel" name="validCellsLabel"><property name="text"><string>—</string></property></widget></item>
+      <item row="2" column="0"><widget class="QLabel" name="validCellsCaption"><property name="text"><string>Valid cells</string></property></widget></item>
+      <item row="2" column="1"><widget class="QLabel" name="validCellsLabel"><property name="text"><string>—</string></property><property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property></widget></item>
 
-      <item row="3" column="0"><widget class="QLabel"><property name="text"><string>Rejected (too few points)</string></property></widget></item>
-      <item row="3" column="1"><widget class="QLabel" name="rejectedByCountLabel"><property name="text"><string>—</string></property></widget></item>
+      <item row="3" column="0"><widget class="QLabel" name="rejectedByCountCaption"><property name="text"><string>Rejected (too few points)</string></property></widget></item>
+      <item row="3" column="1"><widget class="QLabel" name="rejectedByCountLabel"><property name="text"><string>—</string></property><property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property></widget></item>
 
       <item row="4" column="0"><widget class="QLabel" name="rejectedPlanarityCaption"><property name="text"><string>Rejected (low planarity)</string></property></widget></item>
-      <item row="4" column="1"><widget class="QLabel" name="rejectedByPlanarityLabel"><property name="text"><string>—</string></property></widget></item>
+      <item row="4" column="1"><widget class="QLabel" name="rejectedByPlanarityLabel"><property name="text"><string>—</string></property><property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property></widget></item>
 
-      <item row="5" column="0"><widget class="QLabel"><property name="text"><string>Rejected (plane misses box)</string></property></widget></item>
-      <item row="5" column="1"><widget class="QLabel" name="rejectedDegenerateLabel"><property name="text"><string>—</string></property></widget></item>
+      <item row="5" column="0"><widget class="QLabel" name="rejectedDegenerateCaption"><property name="text"><string>Rejected (plane misses box)</string></property></widget></item>
+      <item row="5" column="1"><widget class="QLabel" name="rejectedDegenerateLabel"><property name="text"><string>—</string></property><property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property></widget></item>
      </layout>
     </widget>
    </item>

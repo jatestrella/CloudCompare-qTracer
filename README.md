@@ -114,10 +114,15 @@ exact CloudCompare version you use.
 
 Requires the CloudCompare source tree, a C++17 toolchain, and Qt 6.
 
-1. Clone the CloudCompare source:
+1. Clone the CloudCompare source and check out the pinned version this
+   plugin is known to build against — **`v2.13.1-344-g5cba96f4`**
+   (commit `5cba96f4`):
    ```bash
    git clone https://github.com/CloudCompare/CloudCompare.git
+   cd CloudCompare && git checkout 5cba96f4 && git submodule update --init --recursive
    ```
+   (Newer CloudCompare commits may also work, but the plugin API is only
+   guaranteed against this one.)
 2. Place this plugin directory at
    `<CloudCompare>/plugins/core/Standard/qTracer` (either clone it
    there directly, or symlink / copy it into the CloudCompare tree).

@@ -21,15 +21,25 @@ class ccMesh;
  *
  *  In both cases the per-cell area is the intersection polygon of the local
  *  plane with the cell's axis-aligned box. Mirrors qFacets' partitioning idea
- *  but without any cell-merging / final-facet-fitting step.
+ *  but without any cell-merging / final-facet-fitting step. Both accumulate a
+ *  *3D (rugose) surface area*, which is resolution-dependent for rough surfaces.
+ *
+ *   - **Projected** — fits a single global best-fit plane (PCA), projects all
+ *     points onto it, and measures the footprint area by 2D grid occupancy
+ *     (count of occupied cells x cell^2, an implicit alpha-shape that excludes
+ *     concavities/holes). This yields a *convergent, planar sampling-window
+ *     area* — the appropriate denominator for the P21 areal fracture intensity
+ *     on a quasi-planar outcrop. A convex-hull area is also reported as an
+ *     upper-bound reference.
  */
 class OutcropArea
 {
 public:
 	enum Partitioner
 	{
-		Octree = 0,
-		KdTree = 1
+		Octree    = 0,
+		KdTree    = 1,
+		Projected = 2  //!< single best-fit plane + 2D grid-occupancy footprint
 	};
 
 	struct Params
@@ -44,6 +54,9 @@ public:
 		// Kd-tree-specific
 		double   maxError         = 0.01; //!< max planar-fit residual (RMS) per leaf
 		unsigned minPointsPerLeaf = 10;
+
+		// Projected-specific (best-fit plane + 2D grid occupancy)
+		double   projGridSize     = 0.02; //!< in-plane grid cell side for the occupancy count
 
 		// Shared
 		bool     buildPatchMesh   = true;
@@ -64,6 +77,14 @@ public:
 
 		// Kd-tree-only
 		double   maxLeafError        = 0.0;
+
+		// Projected-only (best-fit plane + 2D occupancy)
+		double   convexHullArea      = 0.0; //!< in-plane convex hull area (reference / upper bound)
+		double   planeDip            = 0.0; //!< best-fit plane dip (deg)
+		double   planeDipDir         = 0.0; //!< best-fit plane dip direction (deg)
+		double   planeRMS            = 0.0; //!< RMS of point residuals off the plane (roughness)
+		double   inPlaneSizeU        = 0.0; //!< extent along the plane's u axis
+		double   inPlaneSizeV        = 0.0; //!< extent along the plane's v axis
 
 		ccMesh*        mesh         = nullptr; //!< caller-owned when non-null
 		ccPointCloud*  meshVertices = nullptr; //!< owned via mesh (vertices)
