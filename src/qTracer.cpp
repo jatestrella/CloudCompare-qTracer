@@ -467,10 +467,11 @@ void qTracer::doPipeline()
 			echo(QString("[qTracer]  3 Lineation | random colors = %1")
 				.arg(dlg.randomColors() ? "yes" : "no (color by dip/dip-dir)"));
 		if (runStage4)
-			echo(QString("[qTracer]  4 Trace Clustering | collinearity radius r_c = %1 | max gap g_max = %2 | max dir deviation = %3 deg")
+			echo(QString("[qTracer]  4 Trace Clustering | collinearity radius r_c = %1 | max gap g_max = %2 | max dir deviation = %3 deg | passes = %4")
 				.arg(dlg.traceConeRadius(), 0, 'g', 6)
 				.arg(dlg.traceTwoTraceDist(), 0, 'g', 6)
-				.arg(dlg.traceMinAngleDeg(), 0, 'g', 6));
+				.arg(dlg.traceMinAngleDeg(), 0, 'g', 6)
+				.arg(dlg.traceMaxPasses()));
 		if (runStage5)
 			echo(QString("[qTracer]  5 Plane Fitting | d_th = %1 | L_th = %2 | theta_th = %3 deg | e_th = %4")
 				.arg(dlg.planeIntersectionLineDist(), 0, 'g', 6)
@@ -662,6 +663,7 @@ void qTracer::doPipeline()
 			dlg.traceConeRadius(),
 			dlg.traceTwoTraceDist(),
 			dlg.traceMinAngleDeg(),
+			dlg.traceMaxPasses(),
 			&progress);
 		if (!tracesGroup || tracesGroup->getChildrenNumber() == 0)
 		{

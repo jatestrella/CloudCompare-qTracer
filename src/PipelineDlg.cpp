@@ -40,6 +40,7 @@ namespace
 			{ "coneRadius",          d->coneRadiusSpinBox },
 			{ "twoTraceDist",        d->twoTraceDistSpinBox },
 			{ "clusterMinAngle",     d->clusterMinAngleSpinBox },
+			{ "traceMaxPasses",      d->traceMaxPassesSpinBox },
 			{ "planeIntersectionDist", d->planeIntersectionDistSpinBox },
 			{ "planeMinTraceLen",    d->planeMinTraceLenSpinBox },
 			{ "planeMinAngle",       d->planeMinAngleSpinBox },
@@ -130,6 +131,7 @@ PipelineDlg::PipelineDlg(QWidget* parent)
 		coneRadiusSpinBox          ->setValue(s.value("coneRadius",          coneRadiusSpinBox          ->value()).toDouble());
 		twoTraceDistSpinBox        ->setValue(s.value("twoTraceDist",        twoTraceDistSpinBox        ->value()).toDouble());
 		clusterMinAngleSpinBox     ->setValue(s.value("clusterMinAngle",     clusterMinAngleSpinBox     ->value()).toDouble());
+		traceMaxPassesSpinBox      ->setValue(s.value("traceMaxPasses",      traceMaxPassesSpinBox      ->value()).toInt());
 
 		// Stage 5
 		planeIntersectionDistSpinBox->setValue(s.value("planeIntersectionDist", planeIntersectionDistSpinBox->value()).toDouble());
@@ -249,6 +251,7 @@ void PipelineDlg::accept()
 		s.setValue("coneRadius",           coneRadiusSpinBox->value());
 		s.setValue("twoTraceDist",         twoTraceDistSpinBox->value());
 		s.setValue("clusterMinAngle",      clusterMinAngleSpinBox->value());
+		s.setValue("traceMaxPasses",       traceMaxPassesSpinBox->value());
 
 		s.setValue("planeIntersectionDist", planeIntersectionDistSpinBox->value());
 		s.setValue("planeMinTraceLen",     planeMinTraceLenSpinBox->value());

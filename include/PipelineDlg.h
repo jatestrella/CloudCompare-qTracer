@@ -50,9 +50,10 @@ public:
 	bool randomColors() const { return randomColorsCheckBox->isChecked(); }
 
 	// Stage 4
-	double traceConeRadius()   const { return coneRadiusSpinBox->value(); }
-	double traceTwoTraceDist() const { return twoTraceDistSpinBox->value(); }
-	double traceMinAngleDeg()  const { return clusterMinAngleSpinBox->value(); }
+	double   traceConeRadius()   const { return coneRadiusSpinBox->value(); }
+	double   traceTwoTraceDist() const { return twoTraceDistSpinBox->value(); }
+	double   traceMinAngleDeg()  const { return clusterMinAngleSpinBox->value(); }
+	unsigned traceMaxPasses()    const { return static_cast<unsigned>(traceMaxPassesSpinBox->value()); }
 
 	// Stage 5
 	double planeIntersectionLineDist()   const { return planeIntersectionDistSpinBox->value(); }

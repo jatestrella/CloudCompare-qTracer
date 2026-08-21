@@ -103,11 +103,15 @@ public:
 	                               bool& error,
 	                               CCCoreLib::GenericProgressCallback* progressCb = nullptr);
 
-	//! Merge close-and-collinear traces into combined traces
+	//! Merge close-and-collinear traces into combined traces.
+	/** Runs the single-pass clustering up to \p maxPasses times, feeding each pass's
+	 *  output back as input (a merged trace may reach further neighbours after the
+	 *  first round). Stops early when the trace count no longer decreases. */
 	static ccHObject* TraceClustering(const ccHObject* ccGroup,
 	                                  double ConeRadius,
 	                                  double TwoTraceDist,
 	                                  double MinAngle,
+	                                  unsigned maxPasses = 1,
 	                                  CCCoreLib::GenericProgressCallback* progressCb = nullptr);
 
 	//! Reconstruct joint planes from pairs of near-intersecting traces.
@@ -146,6 +150,13 @@ public:
 	                                      CCCoreLib::GenericProgressCallback* progressCb = nullptr);
 
 private:
+	//! Single pass of trace clustering (internal helper).
+	static ccHObject* TraceClusteringOnce(const ccHObject* ccGroup,
+	                                      double ConeRadius,
+	                                      double TwoTraceDist,
+	                                      double MinAngle,
+	                                      CCCoreLib::GenericProgressCallback* progressCb);
+
 	//! Single pass of coplanar-plane merging (internal helper).
 	static ccHObject* MergeCoplanarPlanesOnce(const ccHObject* planesGroup,
 	                                          double maxNormalAngleDeg,
