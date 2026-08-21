@@ -658,13 +658,25 @@ void qTracer::doPipeline()
 			return;
 		}
 		announce(4, "Trace Clustering");
+		unsigned tracePassesRun = 0;
 		tracesGroup = IdentifyFracture::TraceClustering(
 			facetsGroup,
 			dlg.traceConeRadius(),
 			dlg.traceTwoTraceDist(),
 			dlg.traceMinAngleDeg(),
 			dlg.traceMaxPasses(),
+			&tracePassesRun,
 			&progress);
+		{
+			const unsigned nTraces = tracesGroup ? tracesGroup->getChildrenNumber() : 0;
+			QString msg = QString("[qTracer]  4 Trace Clustering: ran %1 pass(es) (max %2) -> %3 traces")
+			                  .arg(tracePassesRun)
+			                  .arg(dlg.traceMaxPasses())
+			                  .arg(nTraces);
+			if (tracePassesRun < dlg.traceMaxPasses())
+				msg += "; stopped early (trace count no longer decreasing)";
+			m_app->dispToConsole(msg, ccMainAppInterface::STD_CONSOLE_MESSAGE);
+		}
 		if (!tracesGroup || tracesGroup->getChildrenNumber() == 0)
 		{
 			m_app->dispToConsole("[qTracer] Trace Clustering produced no combined traces.",

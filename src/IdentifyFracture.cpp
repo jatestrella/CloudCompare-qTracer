@@ -620,14 +620,19 @@ ccHObject* IdentifyFracture::TraceClustering(const ccHObject* ccGroup,
                                              double TwoTraceDist,
                                              double MinAngle,
                                              unsigned maxPasses /*=1*/,
+                                             unsigned* passesPerformed /*=nullptr*/,
                                              GenericProgressCallback* progressCb /*=nullptr*/)
 {
+	if (passesPerformed)
+		*passesPerformed = 0;
+
 	if (!ccGroup || maxPasses == 0)
 		return new ccHObject("Traces");
 
 	ccHObject*       current = nullptr;                       // latest pass output (owned here)
 	const ccHObject* feed    = ccGroup;                       // input for next pass (pass 1 = external, not owned)
 	unsigned         prevCount = ccGroup->getChildrenNumber();
+	unsigned         performed = 0;
 
 	for (unsigned pass = 0; pass < maxPasses; ++pass)
 	{
@@ -636,6 +641,7 @@ ccHObject* IdentifyFracture::TraceClustering(const ccHObject* ccGroup,
 
 		ccHObject* next = TraceClusteringOnce(feed, ConeRadius, TwoTraceDist, MinAngle, progressCb);
 		const unsigned nextCount = next ? next->getChildrenNumber() : 0;
+		++performed;
 
 		// `feed` for pass >= 2 IS the previous `current`; TraceClusteringOnce has
 		// finished reading it above, so deleting now is safe.
@@ -645,9 +651,12 @@ ccHObject* IdentifyFracture::TraceClustering(const ccHObject* ccGroup,
 		feed    = next;
 
 		if (nextCount >= prevCount || nextCount <= 1)
-			break;   // converged (no further aggregation) or nothing left to merge
+			break;   // converged (trace count no longer decreasing) or nothing left to merge
 		prevCount = nextCount;
 	}
+
+	if (passesPerformed)
+		*passesPerformed = performed;
 
 	if (!current)
 		current = new ccHObject("Traces");

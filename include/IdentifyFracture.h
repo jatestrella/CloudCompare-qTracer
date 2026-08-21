@@ -106,12 +106,14 @@ public:
 	//! Merge close-and-collinear traces into combined traces.
 	/** Runs the single-pass clustering up to \p maxPasses times, feeding each pass's
 	 *  output back as input (a merged trace may reach further neighbours after the
-	 *  first round). Stops early when the trace count no longer decreases. */
+	 *  first round). Stops early when the trace count no longer decreases.
+	 *  If \p passesPerformed is non-null it receives the number of passes actually run. */
 	static ccHObject* TraceClustering(const ccHObject* ccGroup,
 	                                  double ConeRadius,
 	                                  double TwoTraceDist,
 	                                  double MinAngle,
 	                                  unsigned maxPasses = 1,
+	                                  unsigned* passesPerformed = nullptr,
 	                                  CCCoreLib::GenericProgressCallback* progressCb = nullptr);
 
 	//! Reconstruct joint planes from pairs of near-intersecting traces.
