@@ -331,8 +331,19 @@ Max perpendicular offset of a candidate centroid from the seed plane.</string></
         <property name="value"><double>0.050000000000000</double></property>
        </widget>
       </item>
-      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Max passes</string></property></widget></item>
+      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Max centroid distance</string></property></widget></item>
       <item row="2" column="1">
+       <widget class="QDoubleSpinBox" name="mergeMaxCentroidDistSpinBox">
+        <property name="toolTip"><string>Max centroid-to-centroid distance for two facets to be merged — an in-plane proximity limit that stops coplanar-but-laterally-distant facets being merged across a large gap. 0 = no limit.</string></property>
+        <property name="decimals"><number>4</number></property>
+        <property name="minimum"><double>0.000000000000000</double></property>
+        <property name="maximum"><double>10000.000000000000000</double></property>
+        <property name="singleStep"><double>0.010000000000000</double></property>
+        <property name="value"><double>0.000000000000000</double></property>
+       </widget>
+      </item>
+      <item row="3" column="0"><widget class="QLabel"><property name="text"><string>Max passes</string></property></widget></item>
+      <item row="3" column="1">
        <widget class="QSpinBox" name="mergeMaxPassesSpinBox">
         <property name="toolTip"><string>How many times to re-run the merge on its own output. Stops early if the plane count stops decreasing.</string></property>
         <property name="minimum"><number>1</number></property>
@@ -340,7 +351,7 @@ Max perpendicular offset of a candidate centroid from the seed plane.</string></
         <property name="value"><number>10</number></property>
        </widget>
       </item>
-      <item row="3" column="0">
+      <item row="4" column="0">
        <widget class="QCheckBox" name="mergeDropUnmergedCheckBox">
         <property name="text"><string>Drop unmerged planes (keep only consolidated)</string></property>
         <property name="toolTip"><string>Remove joint planes that were never merged with any other (i.e. that still represent a single stage-5 plane). Keeps only genuinely consolidated planes in the output.</string></property>

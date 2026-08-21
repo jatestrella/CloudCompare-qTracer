@@ -140,6 +140,7 @@ public:
 	static ccHObject* MergeCoplanarPlanes(const ccHObject* planesGroup,
 	                                      double maxNormalAngleDeg,
 	                                      double maxPlaneDist,
+	                                      double maxCentroidDist,   //!< max centroid-to-centroid distance (0 = no limit)
 	                                      unsigned maxPasses = 1,
 	                                      bool dropUnmerged = false,
 	                                      CCCoreLib::GenericProgressCallback* progressCb = nullptr);
@@ -149,6 +150,7 @@ private:
 	static ccHObject* MergeCoplanarPlanesOnce(const ccHObject* planesGroup,
 	                                          double maxNormalAngleDeg,
 	                                          double maxPlaneDist,
+	                                          double maxCentroidDist,
 	                                          CCCoreLib::GenericProgressCallback* progressCb);
 
 public:

@@ -46,6 +46,7 @@ namespace
 			{ "planeMaxEndPointDist", d->planeMaxEndPointDistSpinBox },
 			{ "mergeMaxNormalAngle", d->mergeMaxNormalAngleSpinBox },
 			{ "mergeMaxPlaneDist",   d->mergeMaxPlaneDistSpinBox },
+			{ "mergeMaxCentroidDist", d->mergeMaxCentroidDistSpinBox },
 			{ "mergeMaxPasses",      d->mergeMaxPassesSpinBox },
 			{ "mergeDropUnmerged",   d->mergeDropUnmergedCheckBox },
 		};
@@ -139,6 +140,7 @@ PipelineDlg::PipelineDlg(QWidget* parent)
 		// Stage 6
 		mergeMaxNormalAngleSpinBox ->setValue(s.value("mergeMaxNormalAngle", mergeMaxNormalAngleSpinBox ->value()).toDouble());
 		mergeMaxPlaneDistSpinBox   ->setValue(s.value("mergeMaxPlaneDist",   mergeMaxPlaneDistSpinBox   ->value()).toDouble());
+		mergeMaxCentroidDistSpinBox->setValue(s.value("mergeMaxCentroidDist", mergeMaxCentroidDistSpinBox->value()).toDouble());
 		mergeMaxPassesSpinBox      ->setValue(s.value("mergeMaxPasses",      mergeMaxPassesSpinBox      ->value()).toInt());
 		mergeDropUnmergedCheckBox  ->setChecked(s.value("mergeDropUnmerged", mergeDropUnmergedCheckBox  ->isChecked()).toBool());
 
@@ -255,6 +257,7 @@ void PipelineDlg::accept()
 
 		s.setValue("mergeMaxNormalAngle",  mergeMaxNormalAngleSpinBox->value());
 		s.setValue("mergeMaxPlaneDist",    mergeMaxPlaneDistSpinBox->value());
+		s.setValue("mergeMaxCentroidDist", mergeMaxCentroidDistSpinBox->value());
 		s.setValue("mergeMaxPasses",       mergeMaxPassesSpinBox->value());
 		s.setValue("mergeDropUnmerged",    mergeDropUnmergedCheckBox->isChecked());
 

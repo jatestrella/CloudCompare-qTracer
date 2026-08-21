@@ -28,6 +28,7 @@
 //system
 #include <algorithm>
 #include <limits>
+#include <queue>
 #include <vector>
 
 //Qt
@@ -581,6 +582,39 @@ void IdentifyFracture::SetScalarValueToNOISE(const CCVector3& /*P*/, ScalarType&
 }
 
 
+namespace
+{
+	//! BFS for the shallowest 2-vertex polyline under \p node and return its two
+	//! endpoints. Structure-agnostic: works for `[trace pieces]` facets, `Merged
+	//! trace` nodes, and bare filtered polylines alike — so the trace-consuming
+	//! stages never depend on a hard-coded child index.
+	bool traceEndpointsOf(const ccHObject* node, CCVector3& p, CCVector3& q)
+	{
+		if (!node) return false;
+		std::queue<const ccHObject*> bfs;
+		bfs.push(node);
+		while (!bfs.empty())
+		{
+			const ccHObject* n = bfs.front();
+			bfs.pop();
+			if (n->isKindOf(CC_TYPES::POLY_LINE))
+			{
+				const ccPolyline* pl = static_cast<const ccPolyline*>(n);
+				if (pl->size() == 2)
+				{
+					pl->getPoint(0, p);
+					pl->getPoint(1, q);
+					return true;
+				}
+			}
+			for (unsigned i = 0; i < n->getChildrenNumber(); ++i)
+				bfs.push(n->getChild(i));
+		}
+		return false;
+	}
+}
+
+
 ccHObject* IdentifyFracture::TraceClustering(const ccHObject* ccGroup,
                                              double ConeRadius,
                                              double TwoTraceDist,
@@ -597,24 +631,20 @@ ccHObject* IdentifyFracture::TraceClustering(const ccHObject* ccGroup,
 	ccHObject* victim = new ccHObject("victim");
 	for (unsigned i = 0; i < totalTraces; i++)
 	{
-		const ccHObject* facet = ccGroup->getChild(i);
-		const ccHObject* poly  = (facet && facet->getChildrenNumber() > 2) ? facet->getChild(2) : nullptr;
-		const ccHObject* tips  = (poly && poly->getChildrenNumber() > 0) ? poly->getChild(0) : nullptr;
-		if (!tips || !tips->isKindOf(CC_TYPES::POINT_CLOUD))
-			continue;
-		const ccPointCloud* original = static_cast<const ccPointCloud*>(tips);
-		if (original->size() < 2)
+		// Find this child's trace endpoints robustly (BFS to its 2-vertex polyline),
+		// so any trace group works: `[trace pieces]`, `Traces`, or a filtered group.
+		CCVector3 p, q;
+		if (!traceEndpointsOf(ccGroup->getChild(i), p, q))
 			continue;
 
 		ccPointCloud* clone = new ccPointCloud();
-		if (!clone->reserve(original->size()))
+		if (!clone->reserve(2))
 		{
 			delete clone;
 			continue;
 		}
-		for (unsigned k = 0; k < original->size(); ++k)
-			clone->addPoint(*original->getPoint(k));
-
+		clone->addPoint(p);
+		clone->addPoint(q);
 		clone->setName(QString("Trace piece %1").arg(i));
 		victim->addChild(clone);
 	}
@@ -1053,59 +1083,67 @@ ccHObject* IdentifyFracture::PlaneFitting(const ccHObject* ccGroup,
 	}
 	NormalizedProgress nProgress(progressCb, std::max<unsigned>(totalnum, 1));
 
+	// Gather each child's trace endpoints once, robustly (BFS to its 2-vertex
+	// polyline) — works for `Merged trace` nodes and for bare filtered polylines.
+	std::vector<CCVector3> P(totalnum), Qv(totalnum);
+	std::vector<bool>      valid(totalnum, false);
+	for (unsigned i = 0; i < totalnum; ++i)
+		valid[i] = traceEndpointsOf(ccGroup->getChild(i), P[i], Qv[i]);
+
+	const double c_minCosNormAngle = cos(DegreesToRadians(MinIntersectionAngle));
+
 	for (unsigned i = 0; i < totalnum; ++i)
 	{
-		ccHObject* currentline = ccGroup->getChild(i);
-		ccGenericPointCloud* currentPoint = ccHObjectCaster::ToGenericPointCloud(currentline->getChild(1)->getChild(0), nullptr);
-		GenericIndexedCloud* currentPC = static_cast<GenericIndexedCloud*>(currentPoint);
-		const CCVector3 P1 = *(currentPC->getPoint(0));
-		const CCVector3 Q1 = *(currentPC->getPoint(1));
-		CCVector3 P1Q1  = Q1 - P1;
-		CCVector3 P1Q1n = P1Q1 / P1Q1.norm();
-
-		for (unsigned j = i + 1; j < totalnum; ++j)
+		if (!valid[i]) { nProgress.oneStep(); continue; }
+		const CCVector3 P1 = P[i];
+		const CCVector3 Q1 = Qv[i];
+		const CCVector3 P1Q1 = Q1 - P1;
+		const double len1 = P1Q1.norm();
+		if (len1 > 0.0)
 		{
-			ccHObject* compareline = ccGroup->getChild(j);
-			ccGenericPointCloud* comparePoint = ccHObjectCaster::ToGenericPointCloud(compareline->getChild(1)->getChild(0), nullptr);
-			GenericIndexedCloud* comparePC = static_cast<GenericIndexedCloud*>(comparePoint);
-			const CCVector3 P2 = *(comparePC->getPoint(0));
-			const CCVector3 Q2 = *(comparePC->getPoint(1));
-			CCVector3 P2Q2 = Q2 - P2;
-			CCVector3 P1P2 = P2 - P1;
-			CCVector3 L1L2Cross = P1Q1.cross(P2Q2);
-			L1L2Cross = L1L2Cross / L1L2Cross.norm();
-			CCVector3 P2Q2n = P2Q2 / P2Q2.norm();
-			double dist = std::abs(P1P2.dot(L1L2Cross));
-			const double c_minCosNormAngle = cos(DegreesToRadians(MinIntersectionAngle));
-
-			if (dist < IntersectionLineDistance)
+			const CCVector3 P1Q1n = P1Q1 / static_cast<PointCoordinateType>(len1);
+			for (unsigned j = i + 1; j < totalnum; ++j)
 			{
-				if (P1Q1.norm() > MinTraceLength && P2Q2.norm() > MinTraceLength)
+				if (!valid[j]) continue;
+				const CCVector3 P2 = P[j];
+				const CCVector3 Q2 = Qv[j];
+				const CCVector3 P2Q2 = Q2 - P2;
+				const double len2 = P2Q2.norm();
+				if (len2 <= 0.0) continue;
+
+				const CCVector3 L1L2CrossRaw = P1Q1.cross(P2Q2);
+				const double crossNorm = L1L2CrossRaw.norm();
+				if (crossNorm <= 0.0) continue; // parallel — not a joint-plane pair
+
+				const CCVector3 L1L2Cross = L1L2CrossRaw / static_cast<PointCoordinateType>(crossNorm);
+				const CCVector3 P2Q2n     = P2Q2 / static_cast<PointCoordinateType>(len2);
+				const CCVector3 P1P2      = P2 - P1;
+				const double dist = std::abs(P1P2.dot(L1L2Cross));
+
+				if (dist < IntersectionLineDistance
+					&& len1 > MinTraceLength && len2 > MinTraceLength
+					&& std::abs(P1Q1n.dot(P2Q2n)) <= c_minCosNormAngle
+					&& ((P1 - P2).norm() < MinCorrDist
+						|| (P1 - Q2).norm() < MinCorrDist
+						|| (P2 - Q1).norm() < MinCorrDist
+						|| (Q1 - Q2).norm() < MinCorrDist))
 				{
-					if (std::abs(P1Q1n.dot(P2Q2n)) <= c_minCosNormAngle
-						&& ((P1 - P2).norm() < MinCorrDist
-							|| (P1 - Q2).norm() < MinCorrDist
-							|| (P2 - Q1).norm() < MinCorrDist
-							|| (Q1 - Q2).norm() < MinCorrDist))
+					ccPointCloud* AllPoint = new ccPointCloud();
+					AllPoint->addPoint(P1);
+					AllPoint->addPoint(P2);
+					AllPoint->addPoint(Q1);
+					AllPoint->addPoint(Q2);
+					ccFacet* FitJointPlane = ccFacet::Create(AllPoint, 0, true);
+					if (FitJointPlane)
 					{
-						ccPointCloud* AllPoint = new ccPointCloud();
-						AllPoint->addPoint(P1);
-						AllPoint->addPoint(P2);
-						AllPoint->addPoint(Q1);
-						AllPoint->addPoint(Q2);
-						ccFacet* FitJointPlane = ccFacet::Create(AllPoint, 0, true);
-						if (FitJointPlane)
-						{
-							FitPlaneIndex += 1;
-							QString facetName = QString("joint plane %1").arg(FitPlaneIndex);
-							FitJointPlane->setName(facetName);
-							FitJointPlanes->addChild(FitJointPlane);
-						}
-						else
-						{
-							// Create failed (e.g. the 4 endpoints are collinear) — free the cloud.
-							delete AllPoint;
-						}
+						FitPlaneIndex += 1;
+						FitJointPlane->setName(QString("joint plane %1").arg(FitPlaneIndex));
+						FitJointPlanes->addChild(FitJointPlane);
+					}
+					else
+					{
+						// Create failed (e.g. the 4 endpoints are collinear) — free the cloud.
+						delete AllPoint;
 					}
 				}
 			}
@@ -1123,6 +1161,7 @@ ccHObject* IdentifyFracture::PlaneFitting(const ccHObject* ccGroup,
 ccHObject* IdentifyFracture::MergeCoplanarPlanes(const ccHObject* planesGroup,
                                                  double maxNormalAngleDeg,
                                                  double maxPlaneDist,
+                                                 double maxCentroidDist,
                                                  unsigned maxPasses /*=1*/,
                                                  bool dropUnmerged /*=false*/,
                                                  GenericProgressCallback* progressCb /*=nullptr*/)
@@ -1139,7 +1178,7 @@ ccHObject* IdentifyFracture::MergeCoplanarPlanes(const ccHObject* planesGroup,
 		if (progressCb)
 			progressCb->setInfo(QString("Pass %1/%2…").arg(pass + 1).arg(maxPasses).toUtf8().constData());
 
-		ccHObject* next = MergeCoplanarPlanesOnce(feed, maxNormalAngleDeg, maxPlaneDist, progressCb);
+		ccHObject* next = MergeCoplanarPlanesOnce(feed, maxNormalAngleDeg, maxPlaneDist, maxCentroidDist, progressCb);
 		const unsigned nextCount = next ? next->getChildrenNumber() : 0;
 
 		// Delete the previous pass's owned output (if any) — we're replacing it.
@@ -1183,6 +1222,7 @@ ccHObject* IdentifyFracture::MergeCoplanarPlanes(const ccHObject* planesGroup,
 ccHObject* IdentifyFracture::MergeCoplanarPlanesOnce(const ccHObject* planesGroup,
                                                      double maxNormalAngleDeg,
                                                      double maxPlaneDist,
+                                                     double maxCentroidDist,
                                                      GenericProgressCallback* progressCb)
 {
 	struct PlaneInfo
@@ -1247,6 +1287,12 @@ ccHObject* IdentifyFracture::MergeCoplanarPlanesOnce(const ccHObject* planesGrou
 				if (std::abs(planes[i].normal.dot(planes[j].normal)) < cosAngleThresh) continue;
 				const double d = std::abs((planes[j].center - planes[i].center).dot(planes[i].normal));
 				if (d > maxPlaneDist) continue;
+				// In-plane proximity: reject peers whose centroid is too far away, so
+				// two coplanar-but-distant facets are NOT merged across a large gap
+				// (0 = no limit).
+				if (maxCentroidDist > 0.0
+					&& (planes[j].center - planes[i].center).norm() > maxCentroidDist)
+					continue;
 				group.push_back(static_cast<int>(j));
 			}
 			if (group.size() > bestGroup.size())

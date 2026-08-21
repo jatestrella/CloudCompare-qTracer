@@ -63,6 +63,7 @@ public:
 	// Stage 6
 	double   mergeMaxNormalAngleDeg() const { return mergeMaxNormalAngleSpinBox->value(); }
 	double   mergeMaxPlaneDist()      const { return mergeMaxPlaneDistSpinBox->value(); }
+	double   mergeMaxCentroidDist()   const { return mergeMaxCentroidDistSpinBox->value(); }
 	unsigned mergeMaxPasses()         const { return static_cast<unsigned>(mergeMaxPassesSpinBox->value()); }
 	bool     mergeDropUnmerged()      const { return mergeDropUnmergedCheckBox->isChecked(); }
 };

@@ -478,9 +478,10 @@ void qTracer::doPipeline()
 				.arg(dlg.planeMinIntersectionAngleDeg(), 0, 'g', 6)
 				.arg(dlg.planeMaxEndPointDist(), 0, 'g', 6));
 		if (runStage6)
-			echo(QString("[qTracer]  6 Coplanar Plane Merging | max normal angle alpha_max = %1 deg | max plane offset delta_max = %2 | max passes = %3 | drop unmerged = %4")
+			echo(QString("[qTracer]  6 Coplanar Plane Merging | max normal angle alpha_max = %1 deg | max plane offset delta_max = %2 | max centroid dist = %3 | max passes = %4 | drop unmerged = %5")
 				.arg(dlg.mergeMaxNormalAngleDeg(), 0, 'g', 6)
 				.arg(dlg.mergeMaxPlaneDist(), 0, 'g', 6)
+				.arg(dlg.mergeMaxCentroidDist() > 0.0 ? QString::number(dlg.mergeMaxCentroidDist(), 'g', 6) : QString("none"))
 				.arg(dlg.mergeMaxPasses())
 				.arg(dlg.mergeDropUnmerged() ? "yes" : "no"));
 		echo(QString("[qTracer] ================================================"));
@@ -718,6 +719,7 @@ void qTracer::doPipeline()
 			planesGroup,
 			dlg.mergeMaxNormalAngleDeg(),
 			dlg.mergeMaxPlaneDist(),
+			dlg.mergeMaxCentroidDist(),
 			dlg.mergeMaxPasses(),
 			dlg.mergeDropUnmerged(),
 			&progress);
