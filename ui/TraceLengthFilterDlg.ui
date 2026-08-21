@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>TraceLengthFilterDialog</class>
+ <widget class="QDialog" name="TraceLengthFilterDialog">
+  <property name="geometry"><rect><x>0</x><y>0</y><width>560</width><height>340</height></rect></property>
+  <property name="windowTitle"><string>qTracer — Filter Traces by Length</string></property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QLabel" name="infoLabel">
+     <property name="text"><string>Keep traces whose length is within [min, max]. Drag the green (min) / red (max) cursors on the histogram, or type exact values. Traces outside the range are hidden in the 3D view for preview; on OK a new group with only the kept traces is created — the original group is left unchanged.</string></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="HistogramRangeWidget" name="histogramWidget" native="true">
+     <property name="minimumSize"><size><width>0</width><height>150</height></size></property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="rangeRow">
+     <item><widget class="QLabel"><property name="text"><string>Min length</string></property></widget></item>
+     <item>
+      <widget class="QDoubleSpinBox" name="minLenSpinBox">
+       <property name="decimals"><number>4</number></property>
+       <property name="minimum"><double>0.000000000000000</double></property>
+       <property name="maximum"><double>1000000.000000000000000</double></property>
+       <property name="singleStep"><double>0.010000000000000</double></property>
+       <property name="value"><double>0.000000000000000</double></property>
+      </widget>
+     </item>
+     <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+     <item><widget class="QLabel"><property name="text"><string>Max length</string></property></widget></item>
+     <item>
+      <widget class="QDoubleSpinBox" name="maxLenSpinBox">
+       <property name="decimals"><number>4</number></property>
+       <property name="minimum"><double>0.000000000000000</double></property>
+       <property name="maximum"><double>1000000.000000000000000</double></property>
+       <property name="singleStep"><double>0.010000000000000</double></property>
+       <property name="value"><double>1000000.000000000000000</double></property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="keptLabel"><property name="text"><string>Kept: — / —</string></property></widget>
+   </item>
+   <item>
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="standardButtons"><set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set></property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>HistogramRangeWidget</class>
+   <extends>QWidget</extends>
+   <header>HistogramRangeWidget.h</header>
+   <container>0</container>
+  </customwidget>
+ </customwidgets>
+ <connections>
+  <connection>
+   <sender>buttonBox</sender><signal>accepted()</signal>
+   <receiver>TraceLengthFilterDialog</receiver><slot>accept()</slot>
+   <hints><hint type="sourcelabel"><x>0</x><y>0</y></hint><hint type="destinationlabel"><x>0</x><y>0</y></hint></hints>
+  </connection>
+  <connection>
+   <sender>buttonBox</sender><signal>rejected()</signal>
+   <receiver>TraceLengthFilterDialog</receiver><slot>reject()</slot>
+   <hints><hint type="sourcelabel"><x>0</x><y>0</y></hint><hint type="destinationlabel"><x>0</x><y>0</y></hint></hints>
+  </connection>
+ </connections>
+</ui>

@@ -4,7 +4,7 @@ DFN fracture trace extraction pipeline ported into a CloudCompare Standard plugi
 
 ## What this plugin does
 
-Exposes four `QAction`s:
+Exposes five `QAction`s (the four paper functionalities below, plus a post-processing **Filter Traces by Length…**):
 
 All user-facing names follow the terminology of the accompanying paper (§2) — see "Paper terminology" below before renaming anything.
 
@@ -20,7 +20,7 @@ All user-facing names follow the terminology of the accompanying paper (§2) —
 - **P21 Computation…** — opens `P21Dlg`. Scans the DB tree for candidate trace groups (any node whose top-level children carry a 2-vertex polyline descendant — **polyline-based detection**, matches both stage-3 `[trace pieces]` and stage-4 `Traces` groups; contour polylines are excluded by the 2-vertex size check in `findTracePolyline`) and area meshes (any `ccMesh`), pre-selects the ones matching the current DB selection, and computes P21 = `totalPolylineLength / MeshSamplingTools::computeMeshArea(mesh)`. A "manual area value" checkbox lets the user override the mesh pick with a number typed in. Action is always enabled; auto-detection is in the dialog. User picks the convention (per-cluster vs combined) from the combobox.
 - **Fracture Extraction (Pipeline)** — the main action. Select one point cloud, open `PipelineDlg`, run all 6 stages sequentially:
 
-1. **Eigenvector Computing** — adds `PC Linearity` + `MaxEigVec_X/Y/Z` scalar fields to the cloud.
+1. **Eigenvector Computing** — when the pipeline starts at stage 1 it first **clones** the selected cloud into a working copy `<cloud> [eigen features]` (added under the result root) and runs stage 1 **and every later stage on that clone** — the original selected cloud is never modified (2026-08-21). All the scalar fields below land on the clone, which is shown coloured by `PC Linearity`. (Mid-pipeline starts, stage ≥ 2, operate on the selected cloud directly — no clone.) Adds `PC Linearity` + `MaxEigVec_X/Y/Z` scalar fields to that working cloud. Two modes: **fixed** kernel radius (`ComputeEigen`), or optional **per-point auto-scale** (`ComputeEigenAutoScale`, tick "Auto scale") — for every point it tries `steps` radii in `[r_min, r_max]` and keeps the one that either **minimises eigenentropy** (default, principled) or **maximises linearity**; only radii with ≥ `min neighbours` points count (guards small-scale noise). Auto-scale fills the *same* SFs (so stages 2+ are unchanged) plus an `OptScale` SF holding each point's chosen radius. Added 2026-08-12; the fixed path is untouched.
 2. **Cylindrical DBSCAN Clustering** — custom directional variant (cylinder or sphere neighbourhood, eigenvector alignment check); adds `DBSCAN` SF.
 3. **Lineation** — `AutoSegmentationTools::extractConnectedComponents` on the DBSCAN SF → `createTraces` produces `ccFacet`s + trace polylines in a `[trace pieces]` group, one `Trace piece N` per cluster.
 4. **Trace Clustering** — region-growing merge of close-collinear trace pieces → `Traces` group of `Merged trace N` nodes.
@@ -29,13 +29,15 @@ All user-facing names follow the terminology of the accompanying paper (§2) —
 
 All stage outputs are added under one parent DB node `qTracer [<cloud name>]`.
 
+- **Filter Traces by Length…** (post-processing, not a paper functionality) — opens `TraceLengthFilterDlg` on a selected traces group (`Traces` or `[trace pieces]`). Interactive removal of short/over-long traces with **live 3D preview**: each direct child carrying a 2-vertex polyline (found by the same BFS as P21) is one trace; a `HistogramRangeWidget` shows the length histogram with draggable min/max cursors. While open, traces outside [min,max] are hidden via `setEnabled` (both accept & reject restore the original enabled state — non-destructive). On OK, `qTracer.cpp::doTraceFilter()` builds a **new** sibling group `<name> [len min-max]` holding freshly-rebuilt 2-vertex polylines of the survivors (P21-compatible; not the full `Merged trace` node structure, so re-run the pipeline if you need stage-5 plane fitting). Mirrors `ColorFilterDlg`'s preview/restore pattern. Added 2026-08-21.
+
 ### Running only part of the pipeline
 
 Each stage in `PipelineDlg` is a checkable `QGroupBox`. The user can tick any **contiguous** range (`PipelineDlg::accept` rejects gaps — e.g. "4 + 6 without 5" is not allowed). Starting at stage ≥ 2 requires the selected cloud to already carry the upstream scalar fields (`PC Linearity` / `MaxEigVec_X/Y/Z` for stage 2; `DBSCAN` additionally for stage 3). Starting at stage ≥ 4 expects the selection to be the corresponding ccHObject group (`[trace pieces]` for 4, `Traces` for 5, `Joint Planes` for 6); the group is consumed as read-only input and is not re-parented under the new result root.
 
 Both the per-stage checkbox states **and every parameter value** persist via `QSettings` (org `CCCorp`, app `CloudCompare`, inherited from CC):
 - Stage checks → `qTracer/PipelineDlg/stages/stage{1..6}`
-- Parameters   → `qTracer/PipelineDlg/params/{kernelRadius, dbscanRadius, dbscanMinPoints, dbscanMaxAngle, dbscanLinearity, dbscanSearchType, randomColors, coneRadius, twoTraceDist, clusterMinAngle, planeIntersectionDist, planeMinTraceLen, planeMinAngle, planeMaxEndPointDist, mergeMaxNormalAngle, mergeMaxPlaneDist, mergeMaxPasses}`
+- Parameters   → `qTracer/PipelineDlg/params/{kernelRadius, autoScaleEnabled, autoScaleRMin, autoScaleRMax, autoScaleSteps, autoScaleMinPts, autoScaleCriterion, dbscanRadius, dbscanMinPoints, dbscanMaxAngle, dbscanLinearity, dbscanSearchType, randomColors, coneRadius, twoTraceDist, clusterMinAngle, planeIntersectionDist, planeMinTraceLen, planeMinAngle, planeMaxEndPointDist, mergeMaxNormalAngle, mergeMaxPlaneDist, mergeMaxPasses}`
 
 Writes happen on dialog-accept, not on cancel — so Cancel preserves the previous saved values. On load, missing keys fall back to the widget's `.ui` default (so adding a new parameter later is safe).
 
@@ -72,6 +74,7 @@ These are intentional fixes on top of the straight port. `E:\Research\DFNExtract
 - `include/OutcropAreaDlg.h` / `src/OutcropAreaDlg.cpp` / `ui/OutcropAreaDlg.ui` — combined input + result dialog for the outcrop-area action. Result labels live in the dialog; Compute/Close buttons; dialog stays open so the user can retry with different parameters.
 - `include/P21Dlg.h` / `src/P21Dlg.cpp` / `ui/P21Dlg.ui` — P21 computation dialog. Walks the DB tree once at construction to populate two `QComboBox`es with all candidate trace groups and area meshes. Trace length is summed via `findTracePolyline` (DFS for a 2-vertex `ccPolyline`) + per-polyline Euclidean segment sum. Area comes from `MeshSamplingTools::computeMeshArea` on the chosen mesh, or a manual value.
 - `include/PipelineDlg.h` / `src/PipelineDlg.cpp` / `ui/PipelineDlg.ui` — combined parameter dialog (6 checkable `QGroupBox` sections, one per stage).
+- `include/TraceLengthFilterDlg.h` / `src/TraceLengthFilterDlg.cpp` / `ui/TraceLengthFilterDlg.ui` — interactive length filter for a traces group. Reuses `HistogramRangeWidget` (min/max cursors) + the `ColorFilterDlg` live-preview/restore pattern, but toggles each trace node's `setEnabled` instead of a point-visibility array. Exposes `traces()` / `minLen()` / `maxLen()` so `doTraceFilter()` can materialise survivors.
 - `include/IdentifyFracture.h` / `src/IdentifyFracture.cpp` — algorithm API (`ComputeEigen`, `runDBSCAN`, `expandCluster`, `createTraces`, `TraceClustering`, `PlaneFitting`, `MergeCoplanarPlanes`, helpers). All 6 pipeline entry points accept an optional `GenericProgressCallback*` and drive it via `NormalizedProgress`. Note: stage 3's `extractConnectedComponents` is a CCCoreLib built-in that does not itself take a progress callback — progress during stage 3 only tracks the facet-build loop.
 - `include/facetsClassifier.h` — copied from qFacets; defines `c_darkColorRatio` + `FacetsClassifier::GenerateSubfamilyColor`.
 - `include/disclaimerDialog.h` — inline `DisclaimerDialog` + `ShowDisclaimer()`. Header-only with a `static` flag; only `qTracer.cpp` includes it (don't include elsewhere — would cause multiple-definition linker errors).

@@ -20,6 +20,11 @@ Intermediate and final groups are added to the DB tree.</string>
     </widget>
    </item>
 
+   <item>
+    <layout class="QHBoxLayout" name="stageColumns">
+     <item>
+      <layout class="QVBoxLayout" name="leftColumn">
+
    <!-- Stage 1 : Eigenvector Computing -->
    <item>
     <widget class="QGroupBox" name="eigenGroup">
@@ -37,6 +42,67 @@ Outputs per point: eigenvalues λ₁ ≥ λ₂ ≥ λ₃, principal eigenvector 
         <property name="maximum"><double>10000.000000000000000</double></property>
         <property name="singleStep"><double>0.010000000000000</double></property>
         <property name="value"><double>0.100000000000000</double></property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QCheckBox" name="autoScaleCheckBox">
+        <property name="text"><string>Auto scale (per-point optimal radius)</string></property>
+        <property name="toolTip"><string>When on, stage 1 evaluates PCA linearity at several radii per point and keeps, for each point, the radius that maximises linearity. Fills the same PC Linearity / MaxEigVec SFs (plus an OptScale field) so stages 2+ are unchanged. The fixed kernel radius above is then ignored.</string></property>
+        <property name="checked"><bool>false</bool></property>
+       </widget>
+      </item>
+      <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Auto: min radius (r_min)</string></property></widget></item>
+      <item row="2" column="1">
+       <widget class="QDoubleSpinBox" name="autoScaleRMinSpinBox">
+        <property name="toolTip"><string>Smallest candidate radius. Keep it well above the point spacing (enough points for a stable PCA).</string></property>
+        <property name="decimals"><number>4</number></property>
+        <property name="minimum"><double>0.000100000000000</double></property>
+        <property name="maximum"><double>10000.000000000000000</double></property>
+        <property name="singleStep"><double>0.010000000000000</double></property>
+        <property name="value"><double>0.020000000000000</double></property>
+       </widget>
+      </item>
+      <item row="3" column="0"><widget class="QLabel"><property name="text"><string>Auto: max radius (r_max)</string></property></widget></item>
+      <item row="3" column="1">
+       <widget class="QDoubleSpinBox" name="autoScaleRMaxSpinBox">
+        <property name="toolTip"><string>Largest candidate radius. The per-point search runs over [r_min, r_max].</string></property>
+        <property name="decimals"><number>4</number></property>
+        <property name="minimum"><double>0.000100000000000</double></property>
+        <property name="maximum"><double>10000.000000000000000</double></property>
+        <property name="singleStep"><double>0.010000000000000</double></property>
+        <property name="value"><double>0.200000000000000</double></property>
+       </widget>
+      </item>
+      <item row="4" column="0"><widget class="QLabel"><property name="text"><string>Auto: steps</string></property></widget></item>
+      <item row="4" column="1">
+       <widget class="QSpinBox" name="autoScaleStepsSpinBox">
+        <property name="toolTip"><string>How many radii to test, evenly spaced in [r_min, r_max] (inclusive). Cost scales with this.</string></property>
+        <property name="minimum"><number>1</number></property>
+        <property name="maximum"><number>50</number></property>
+        <property name="value"><number>5</number></property>
+       </widget>
+      </item>
+      <item row="5" column="0"><widget class="QLabel"><property name="text"><string>Auto: min neighbours</string></property></widget></item>
+      <item row="5" column="1">
+       <widget class="QSpinBox" name="autoScaleMinPtsSpinBox">
+        <property name="toolTip"><string>A radius is only considered for a point if its neighbourhood holds at least this many points — guards against tiny-scale noise that would otherwise look spuriously linear.</string></property>
+        <property name="minimum"><number>3</number></property>
+        <property name="maximum"><number>100000</number></property>
+        <property name="value"><number>15</number></property>
+       </widget>
+      </item>
+      <item row="6" column="0"><widget class="QLabel"><property name="text"><string>Auto: criterion</string></property></widget></item>
+      <item row="6" column="1">
+       <widget class="QComboBox" name="autoScaleCriterionComboBox">
+        <property name="toolTip"><string>How each point's best radius is chosen. Min eigenentropy = the scale where the local structure is least ambiguous (principled, recommended). Max linearity = simpler but biases toward small scales.</string></property>
+        <item><property name="text"><string>Min eigenentropy (recommended)</string></property></item>
+        <item><property name="text"><string>Max linearity</string></property></item>
+       </widget>
+      </item>
+      <item row="7" column="0">
+       <widget class="QLabel" name="eigenCloneNote">
+        <property name="text"><string>Stage 1 runs on a clone named "&lt;cloud&gt; [eigen features]"; the original cloud is never modified.</string></property>
+        <property name="wordWrap"><bool>true</bool></property>
        </widget>
       </item>
      </layout>
@@ -123,6 +189,12 @@ Sphere: classical DBSCAN neighbourhood of radius R.</string></property>
      </layout>
     </widget>
    </item>
+
+      <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property></spacer></item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QVBoxLayout" name="rightColumn">
 
    <!-- Stage 4 : Trace Clustering -->
    <item>
@@ -268,8 +340,29 @@ Max perpendicular offset of a candidate centroid from the seed plane.</string></
         <property name="value"><number>10</number></property>
        </widget>
       </item>
+      <item row="3" column="0">
+       <widget class="QCheckBox" name="mergeDropUnmergedCheckBox">
+        <property name="text"><string>Drop unmerged planes (keep only consolidated)</string></property>
+        <property name="toolTip"><string>Remove joint planes that were never merged with any other (i.e. that still represent a single stage-5 plane). Keeps only genuinely consolidated planes in the output.</string></property>
+        <property name="checked"><bool>false</bool></property>
+       </widget>
+      </item>
      </layout>
     </widget>
+   </item>
+
+      <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property></spacer></item>
+      </layout>
+     </item>
+    </layout>
+   </item>
+
+   <item>
+    <layout class="QHBoxLayout" name="paramIoLayout">
+     <item><widget class="QPushButton" name="importParamsButton"><property name="text"><string>Import params…</string></property><property name="toolTip"><string>Load all pipeline parameters and stage selections from a text file.</string></property></widget></item>
+     <item><widget class="QPushButton" name="exportParamsButton"><property name="text"><string>Export params…</string></property><property name="toolTip"><string>Save all current pipeline parameters and stage selections to a text file.</string></property></widget></item>
+     <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+    </layout>
    </item>
 
    <item>

@@ -32,6 +32,7 @@
 
 //Qt
 #include <QString>
+#include <QVariant>
 
 using namespace CCCoreLib;
 
@@ -193,6 +194,254 @@ IdentifyFracture::ErrorCode IdentifyFracture::ComputeEigen(
 	{
 		result = ProcessFailed;
 	}
+
+	if (octree && !inputOctree)
+	{
+		delete octree;
+		octree = nullptr;
+	}
+
+	return result;
+}
+
+
+namespace
+{
+	//! Shared read-only parameters for the per-point auto-scale octree callback.
+	struct AutoScaleParams
+	{
+		ccPointCloud*       pc      = nullptr;
+		ScalarField*        linSF   = nullptr;
+		ScalarField*        exSF    = nullptr;
+		ScalarField*        eySF    = nullptr;
+		ScalarField*        ezSF    = nullptr;
+		ScalarField*        scaleSF = nullptr;
+		std::vector<double> scales;            //!< candidate radii, ascending
+		double              rMax      = 0.0;
+		unsigned            minNeigh  = 10;
+		int                 criterion = 1;     //!< 0 = max linearity, 1 = min eigenentropy
+	};
+
+	//! Octree cell callback: for each point, pick the radius (in AutoScaleParams::scales)
+	//! that maximises PCA linearity, then write that scale's L / v1 / radius to the SFs.
+	bool autoScaleCellFunc(const DgmOctree::octreeCell& cell,
+	                       void** additionalParameters,
+	                       NormalizedProgress* nProgress)
+	{
+		AutoScaleParams& ap = *static_cast<AutoScaleParams*>(additionalParameters[0]);
+
+		DgmOctree::NearestNeighboursSearchStruct nNSS;
+		nNSS.level = cell.level;
+		cell.parentOctree->getCellPos(cell.truncatedCode, cell.level, nNSS.cellPos, true);
+		cell.parentOctree->computeCellCenter(nNSS.cellPos, cell.level, nNSS.cellCenter);
+
+		const unsigned np = cell.points->size();
+		try
+		{
+			nNSS.pointsInNeighbourhood.resize(np);
+		}
+		catch (const std::bad_alloc&)
+		{
+			return false;
+		}
+		{
+			DgmOctree::NeighboursSet::iterator it = nNSS.pointsInNeighbourhood.begin();
+			for (unsigned i = 0; i < np; ++i, ++it)
+			{
+				it->point      = cell.points->getPointPersistentPtr(i);
+				it->pointIndex = cell.points->getPointGlobalIndex(i);
+			}
+		}
+		nNSS.alreadyVisitedNeighbourhoodSize = 1;
+
+		ReferenceCloud rc(ap.pc);
+
+		for (unsigned i = 0; i < np; ++i)
+		{
+			cell.points->getPoint(i, nNSS.queryPoint);
+			const unsigned cnt = cell.parentOctree->findNeighborsInASphereStartingFromCell(
+				nNSS, static_cast<PointCoordinateType>(ap.rMax), false);
+
+			double    bestMetric = -std::numeric_limits<double>::max();
+			double    bestL      = -1.0;
+			double    bestScale  = -1.0;
+			CCVector3 bestVec(0, 0, 1);
+
+			for (double r : ap.scales)
+			{
+				const double r2 = r * r;
+				rc.clear(false);
+				for (unsigned j = 0; j < cnt; ++j)
+				{
+					if (nNSS.pointsInNeighbourhood[j].squareDistd <= r2)
+						rc.addPointIndex(nNSS.pointsInNeighbourhood[j].pointIndex);
+				}
+				if (rc.size() < ap.minNeigh)
+					continue;
+
+				Neighbourhood nb(&rc);
+				SquareMatrixd cov = nb.computeCovarianceMatrix();
+				SquareMatrixd eV;
+				std::vector<double> ev;
+				if (!Jacobi<double>::ComputeEigenValuesAndVectors(cov, eV, ev, true))
+					continue;
+				Jacobi<double>::SortEigenValuesAndVectors(eV, ev);
+
+				const double l1 = std::max(ev[0], 0.0);
+				const double l2 = std::max(ev[1], 0.0);
+				const double l3 = std::max(ev[2], 0.0);
+				const double L  = (l1 > 1e-12) ? (l1 - l2) / l1 : 0.0;
+
+				// Selection metric — larger is better. Linearity: maximise L.
+				// Eigenentropy: minimise E = -Σ e_i ln(e_i)  =>  maximise -E.
+				double metric;
+				if (ap.criterion == 1)
+				{
+					const double s = l1 + l2 + l3;
+					double E = 0.0;
+					if (s > 1e-12)
+					{
+						for (double lv : {l1, l2, l3})
+						{
+							const double e = lv / s;
+							if (e > 1e-12) E -= e * std::log(e);
+						}
+					}
+					metric = -E;
+				}
+				else
+				{
+					metric = L;
+				}
+
+				if (metric > bestMetric)
+				{
+					bestMetric = metric;
+					bestL      = L;
+					bestScale  = r;
+					CCVector3d vv;
+					Jacobi<double>::GetEigenVector(eV, 0, vv.u);
+					bestVec = CCVector3(static_cast<PointCoordinateType>(vv.x),
+					                    static_cast<PointCoordinateType>(vv.y),
+					                    static_cast<PointCoordinateType>(vv.z));
+				}
+			}
+
+			const unsigned gi = cell.points->getPointGlobalIndex(i);
+			ap.linSF->setValue(gi, static_cast<ScalarType>(bestL));
+			ap.exSF ->setValue(gi, static_cast<ScalarType>(bestVec.x));
+			ap.eySF ->setValue(gi, static_cast<ScalarType>(bestVec.y));
+			ap.ezSF ->setValue(gi, static_cast<ScalarType>(bestVec.z));
+			if (ap.scaleSF)
+				ap.scaleSF->setValue(gi, static_cast<ScalarType>(bestScale));
+
+			if (nProgress && !nProgress->oneStep())
+				return false;
+		}
+		return true;
+	}
+} // anonymous namespace
+
+
+IdentifyFracture::ErrorCode IdentifyFracture::ComputeEigenAutoScale(
+	GenericIndexedCloudPersist* cloud,
+	double rMin,
+	double rMax,
+	unsigned steps,
+	unsigned minNeighbours,
+	int scaleCriterion,
+	GenericProgressCallback* progressCb /*=nullptr*/,
+	DgmOctree* inputOctree /*=nullptr*/)
+{
+	if (!cloud)
+		return InvalidInput;
+	if (cloud->size() < 4)
+		return NotEnoughPoints;
+	if (rMin <= 0.0 || rMax < rMin || steps < 1)
+		return InvalidInput;
+
+	ccPointCloud* pc = static_cast<ccPointCloud*>(cloud);
+
+	DgmOctree* octree = inputOctree;
+	if (!octree)
+	{
+		octree = new DgmOctree(cloud);
+		if (octree->build(progressCb) < 1)
+		{
+			delete octree;
+			return OctreeComputationFailed;
+		}
+	}
+
+	// (Re)create the output scalar fields. addScalarField refuses duplicates, so a
+	// pre-existing field of the same name is reused (and overwritten) — same policy
+	// as the fixed-radius ComputeEigen path.
+	auto ensureSF = [&](const char* name) -> ScalarField*
+	{
+		int idx = pc->getScalarFieldIndexByName(name);
+		if (idx < 0)
+			idx = pc->addScalarField(name);
+		return (idx >= 0) ? pc->getScalarField(idx) : nullptr;
+	};
+	ScalarField* linSF   = ensureSF("PC Linearity");
+	ScalarField* exSF    = ensureSF("MaxEigVec_X");
+	ScalarField* eySF    = ensureSF("MaxEigVec_Y");
+	ScalarField* ezSF    = ensureSF("MaxEigVec_Z");
+	ScalarField* scaleSF = ensureSF("OptScale");
+	if (!linSF || !exSF || !eySF || !ezSF || !scaleSF)
+	{
+		if (octree && !inputOctree) delete octree;
+		return ProcessFailed;
+	}
+	const unsigned nPts = cloud->size();
+	for (unsigned i = 0; i < nPts; ++i)
+	{
+		linSF  ->setValue(i, static_cast<ScalarType>(-1));
+		exSF   ->setValue(i, 0);
+		eySF   ->setValue(i, 0);
+		ezSF   ->setValue(i, static_cast<ScalarType>(1));
+		scaleSF->setValue(i, static_cast<ScalarType>(-1));
+	}
+
+	AutoScaleParams ap;
+	ap.pc       = pc;
+	ap.linSF    = linSF;
+	ap.exSF     = exSF;
+	ap.eySF     = eySF;
+	ap.ezSF     = ezSF;
+	ap.scaleSF  = scaleSF;
+	ap.rMax      = rMax;
+	ap.minNeigh  = std::max<unsigned>(minNeighbours, 3);
+	ap.criterion = scaleCriterion;
+	ap.scales.reserve(steps);
+	if (steps == 1)
+	{
+		ap.scales.push_back(rMin);
+	}
+	else
+	{
+		for (unsigned k = 0; k < steps; ++k)
+			ap.scales.push_back(rMin + (rMax - rMin) * static_cast<double>(k) / static_cast<double>(steps - 1));
+	}
+
+	const unsigned char level = octree->findBestLevelForAGivenNeighbourhoodSizeExtraction(
+		static_cast<PointCoordinateType>(rMax));
+
+	void* params[1] = { &ap };
+	ErrorCode result = NoError;
+	if (octree->executeFunctionForAllCellsAtLevel(level,
+		&autoScaleCellFunc,
+		params,
+		true,
+		progressCb,
+		"Eigenvector Computing (auto scale)") == 0)
+	{
+		result = ProcessFailed;
+	}
+
+	// Recompute min/max so the SFs display correctly.
+	linSF->computeMinAndMax();
+	scaleSF->computeMinAndMax();
 
 	if (octree && !inputOctree)
 	{
@@ -491,6 +740,7 @@ ccHObject* IdentifyFracture::TraceClustering(const ccHObject* ccGroup,
 
 		ccPointCloud* TipVertices = new ccPointCloud();
 		ccPolyline* TracePoly = new ccPolyline(TipVertices);
+		TracePoly->setName("MergedPolyline");
 		TracePoly->addChild(TipVertices);
 
 		TipVertices->reserve(2);
@@ -677,6 +927,12 @@ ccHObject* IdentifyFracture::createTraces(ccPointCloud* cloud,
 		{
 			error = true;
 		}
+		else if (facetCloud->size() < 3)
+		{
+			// A cluster with < 3 points cannot form a facet — skip it silently
+			// (otherwise ccFacet::Create pops a "Need at least 3 points" error dialog).
+			delete facetCloud;
+		}
 		else
 		{
 			ccFacet* facet = ccFacet::Create(facetCloud, 0, true);
@@ -751,6 +1007,11 @@ ccHObject* IdentifyFracture::createTraces(ccPointCloud* cloud,
 
 				ccGroup->addChild(facet);
 				facet->addChild(newPoly);
+			}
+			else
+			{
+				// ccFacet::Create failed (e.g. all points collinear) — free the clone.
+				delete facetCloud;
 			}
 		}
 
@@ -833,11 +1094,18 @@ ccHObject* IdentifyFracture::PlaneFitting(const ccHObject* ccGroup,
 						AllPoint->addPoint(Q1);
 						AllPoint->addPoint(Q2);
 						ccFacet* FitJointPlane = ccFacet::Create(AllPoint, 0, true);
-
-						FitPlaneIndex += 1;
-						QString facetName = QString("joint plane %1").arg(FitPlaneIndex);
-						FitJointPlane->setName(facetName);
-						FitJointPlanes->addChild(FitJointPlane);
+						if (FitJointPlane)
+						{
+							FitPlaneIndex += 1;
+							QString facetName = QString("joint plane %1").arg(FitPlaneIndex);
+							FitJointPlane->setName(facetName);
+							FitJointPlanes->addChild(FitJointPlane);
+						}
+						else
+						{
+							// Create failed (e.g. the 4 endpoints are collinear) — free the cloud.
+							delete AllPoint;
+						}
 					}
 				}
 			}
@@ -856,6 +1124,7 @@ ccHObject* IdentifyFracture::MergeCoplanarPlanes(const ccHObject* planesGroup,
                                                  double maxNormalAngleDeg,
                                                  double maxPlaneDist,
                                                  unsigned maxPasses /*=1*/,
+                                                 bool dropUnmerged /*=false*/,
                                                  GenericProgressCallback* progressCb /*=nullptr*/)
 {
 	if (!planesGroup || maxPasses == 0)
@@ -887,6 +1156,26 @@ ccHObject* IdentifyFracture::MergeCoplanarPlanes(const ccHObject* planesGroup,
 
 	if (!current)
 		current = new ccHObject("Merged Joint Planes");
+
+	// Optionally drop planes that were never merged (represent a single original
+	// stage-5 plane) — keep only genuinely consolidated joint planes.
+	if (dropUnmerged)
+	{
+		std::vector<ccHObject*> toRemove;
+		for (unsigned i = 0; i < current->getChildrenNumber(); ++i)
+		{
+			ccHObject* c = current->getChild(i);
+			const QVariant v = c ? c->getMetaData("qtracer.origSources") : QVariant();
+			if ((v.isValid() ? v.toInt() : 1) <= 1)
+				toRemove.push_back(c);
+		}
+		for (ccHObject* c : toRemove)
+		{
+			current->detachChild(c);
+			delete c;
+		}
+	}
+
 	return current;
 }
 
@@ -981,14 +1270,25 @@ ccHObject* IdentifyFracture::MergeCoplanarPlanesOnce(const ccHObject* planesGrou
 				agg->addPoint(*src->getPoint(k));
 		}
 
+		// Accumulate how many *original* (stage-5) planes this facet represents,
+		// summing the members' counts so it survives across passes. An input facet
+		// with no tag counts as 1. A final facet whose total is 1 was never merged.
+		int origSources = 0;
+		for (int idx : bestGroup)
+		{
+			const QVariant v = planes[idx].facet->getMetaData("qtracer.origSources");
+			origSources += v.isValid() ? v.toInt() : 1;
+		}
+
 		ccFacet* mergedFacet = nullptr;
 		if (agg->size() >= 3)
 			mergedFacet = ccFacet::Create(agg, 0, /*transferOwnership=*/true);
 		if (mergedFacet)
 		{
 			++mergedIndex;
-			mergedFacet->setName(QString("merged joint plane %1 (%2 sources)")
-				.arg(mergedIndex).arg(bestGroup.size()));
+			mergedFacet->setMetaData("qtracer.origSources", origSources);
+			mergedFacet->setName(QString("merged joint plane %1 (%2 planes)")
+				.arg(mergedIndex).arg(origSources));
 			merged->addChild(mergedFacet);
 		}
 		else

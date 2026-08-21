@@ -15,6 +15,7 @@
 //qCC_db
 #include <ccHObjectCaster.h>
 #include <ccPointCloud.h>
+#include <ccPolyline.h>
 #include <ccProgressDialog.h>
 #include <ccScalarField.h>
 
@@ -26,6 +27,7 @@
 #include "OutcropAreaDlg.h"
 #include "P21Dlg.h"
 #include "PipelineDlg.h"
+#include "TraceLengthFilterDlg.h"
 
 //CCCoreLib
 #include <CCConst.h>
@@ -98,7 +100,14 @@ QList<QAction*> qTracer::getActions()
 		m_p21Action->setIcon(QIcon(":/CC/plugin/qTracer/images/icon_p21.svg"));
 		connect(m_p21Action, &QAction::triggered, this, &qTracer::doP21);
 	}
-	return { m_colorFilterAction, m_outcropAreaAction, m_p21Action, m_action };
+	if (!m_traceFilterAction)
+	{
+		m_traceFilterAction = new QAction("Filter Traces by Length…", this);
+		m_traceFilterAction->setToolTip("Interactively remove short (or over-long) traces from a Traces group,\n"
+		                                "with a draggable length histogram and live 3D preview.");
+		connect(m_traceFilterAction, &QAction::triggered, this, &qTracer::doTraceFilter);
+	}
+	return { m_colorFilterAction, m_outcropAreaAction, m_p21Action, m_traceFilterAction, m_action };
 }
 
 // ---------------------------------------------------------------------------
@@ -138,6 +147,91 @@ void qTracer::doP21()
 
 	P21Dlg dlg(m_app, m_app->getMainWindow());
 	dlg.exec();
+}
+
+// ---------------------------------------------------------------------------
+void qTracer::doTraceFilter()
+{
+	if (!ShowDisclaimer(m_app))
+		return;
+	assert(m_app);
+	if (!m_app)
+		return;
+
+	const ccHObject::Container& sel = m_app->getSelectedEntities();
+	if (sel.size() != 1 || !sel.front())
+	{
+		m_app->dispToConsole("[qTracer] Select exactly one traces group.", ccMainAppInterface::ERR_CONSOLE_MESSAGE);
+		return;
+	}
+	ccHObject* group = sel.front();
+
+	TraceLengthFilterDlg dlg(group, m_app, m_app->getMainWindow());
+	if (dlg.traceCount() == 0)
+	{
+		m_app->dispToConsole("[qTracer] The selected group has no 2-vertex trace polylines to filter.",
+		                     ccMainAppInterface::ERR_CONSOLE_MESSAGE);
+		return;
+	}
+	if (!dlg.exec())
+		return;
+
+	// Materialise the surviving traces into a new (non-destructive) group.
+	const double lo = dlg.minLen();
+	const double hi = dlg.maxLen();
+	ccHObject* outGroup = new ccHObject(group->getName() + QString(" [len %1-%2]").arg(lo, 0, 'f', 3).arg(hi, 0, 'f', 3));
+	outGroup->setDisplay(group->getDisplay());
+
+	unsigned k = 0;
+	for (const TraceLengthFilterDlg::TraceEntry& t : dlg.traces())
+	{
+		if (!t.poly || t.length < lo || t.length > hi)
+			continue;
+		CCVector3 a, b;
+		t.poly->getPoint(0, a);
+		t.poly->getPoint(1, b);
+
+		ccPointCloud* verts = new ccPointCloud();
+		ccPolyline*   poly  = new ccPolyline(verts);
+		poly->addChild(verts);
+		verts->reserve(2);
+		verts->addPoint(a);
+		verts->addPoint(b);
+		verts->setEnabled(false);
+		poly->addPointIndex(0, 2);
+		poly->set2DMode(false);
+		poly->setTempColor(ccColor::red);
+		poly->setName(QString("Merged trace %1").arg(k++));
+		poly->setDisplay(group->getDisplay());
+		outGroup->addChild(poly);
+	}
+
+	if (outGroup->getChildrenNumber() == 0)
+	{
+		m_app->dispToConsole("[qTracer] Length filter kept 0 traces — nothing created.",
+		                     ccMainAppInterface::WRN_CONSOLE_MESSAGE);
+		delete outGroup;
+		return;
+	}
+
+	if (ccHObject* parent = group->getParent())
+		parent->addChild(outGroup);
+	m_app->addToDB(outGroup);
+
+	// Hide the source group and move the selection to the filtered one, so the 3D
+	// view immediately shows only the kept traces (non-destructive — the original
+	// group is just unchecked and can be re-enabled anytime).
+	group->setEnabled(false);
+	m_app->setSelectedInDB(group, false);
+	m_app->setSelectedInDB(outGroup, true);
+	group->redrawDisplay();
+	m_app->redrawAll();
+
+	m_app->dispToConsole(
+		QString("[qTracer] Length filter kept %1 / %2 traces (len in [%3, %4]) → \"%5\".")
+			.arg(outGroup->getChildrenNumber()).arg(dlg.traceCount())
+			.arg(lo, 0, 'f', 3).arg(hi, 0, 'f', 3).arg(outGroup->getName()),
+		ccMainAppInterface::STD_CONSOLE_MESSAGE);
 }
 
 // ---------------------------------------------------------------------------
@@ -341,22 +435,119 @@ void qTracer::doPipeline()
 	const bool runStage6 = firstStage <= 6 && lastStage >= 6;
 
 	// ---------------------------------------------------------------------
+	// Echo the input parameters to the console so a finished run is reproducible.
+	// ---------------------------------------------------------------------
+	{
+		auto echo = [&](const QString& s) {
+			m_app->dispToConsole(s, ccMainAppInterface::STD_CONSOLE_MESSAGE);
+		};
+		echo(QString("[qTracer] ===== Pipeline parameters (stages %1-%2) on '%3' =====")
+			.arg(firstStage).arg(lastStage).arg(sourceName));
+		if (runStage1)
+		{
+			if (dlg.autoScaleEnabled())
+				echo(QString("[qTracer]  1 Eigenvector Computing (AUTO SCALE) | radius in [%1, %2], %3 steps | min neighbours = %4 | criterion = %5")
+					.arg(dlg.autoScaleRMin(), 0, 'g', 6)
+					.arg(dlg.autoScaleRMax(), 0, 'g', 6)
+					.arg(dlg.autoScaleSteps())
+					.arg(dlg.autoScaleMinPts())
+					.arg(dlg.autoScaleCriterion() == 1 ? "min eigenentropy" : "max linearity"));
+			else
+				echo(QString("[qTracer]  1 Eigenvector Computing | kernel radius r_k = %1")
+					.arg(dlg.kernelRadius(), 0, 'g', 6));
+		}
+		if (runStage2)
+			echo(QString("[qTracer]  2 Cylindrical DBSCAN | R = %1 | minPts = %2 | max eigvec angle = %3 deg | linearity L = %4 | search = %5")
+				.arg(dlg.dbscanRadius(), 0, 'g', 6)
+				.arg(dlg.dbscanMinPoints())
+				.arg(dlg.dbscanMaxAngleDeg(), 0, 'g', 6)
+				.arg(dlg.dbscanLinearityThresh(), 0, 'g', 6)
+				.arg(dlg.dbscanSearchType() == 1 ? "Cylinder (along v1, h=2R)" : "Sphere"));
+		if (runStage3)
+			echo(QString("[qTracer]  3 Lineation | random colors = %1")
+				.arg(dlg.randomColors() ? "yes" : "no (color by dip/dip-dir)"));
+		if (runStage4)
+			echo(QString("[qTracer]  4 Trace Clustering | collinearity radius r_c = %1 | max gap g_max = %2 | max dir deviation = %3 deg")
+				.arg(dlg.traceConeRadius(), 0, 'g', 6)
+				.arg(dlg.traceTwoTraceDist(), 0, 'g', 6)
+				.arg(dlg.traceMinAngleDeg(), 0, 'g', 6));
+		if (runStage5)
+			echo(QString("[qTracer]  5 Plane Fitting | d_th = %1 | L_th = %2 | theta_th = %3 deg | e_th = %4")
+				.arg(dlg.planeIntersectionLineDist(), 0, 'g', 6)
+				.arg(dlg.planeMinTraceLength(), 0, 'g', 6)
+				.arg(dlg.planeMinIntersectionAngleDeg(), 0, 'g', 6)
+				.arg(dlg.planeMaxEndPointDist(), 0, 'g', 6));
+		if (runStage6)
+			echo(QString("[qTracer]  6 Coplanar Plane Merging | max normal angle alpha_max = %1 deg | max plane offset delta_max = %2 | max passes = %3 | drop unmerged = %4")
+				.arg(dlg.mergeMaxNormalAngleDeg(), 0, 'g', 6)
+				.arg(dlg.mergeMaxPlaneDist(), 0, 'g', 6)
+				.arg(dlg.mergeMaxPasses())
+				.arg(dlg.mergeDropUnmerged() ? "yes" : "no"));
+		echo(QString("[qTracer] ================================================"));
+	}
+
+	// ---------------------------------------------------------------------
 	// Stage 1 : Eigenvector Computing
 	// ---------------------------------------------------------------------
 	if (runStage1)
 	{
-		announce(1, "Eigenvector Computing");
-		IdentifyFracture::ErrorCode rc = IdentifyFracture::ComputeEigen(
-			pc,
-			static_cast<PointCoordinateType>(dlg.kernelRadius()),
-			&progress,
-			nullptr);
-		if (rc != IdentifyFracture::NoError)
+		// Work on a CLONE so the original selected cloud is never modified: all
+		// scalar fields (PC Linearity, MaxEigVec_X/Y/Z, OptScale) go on this copy,
+		// and every subsequent stage operates on it too.
+		ccPointCloud* work = pc->cloneThis(nullptr, true);
+		if (!work)
 		{
-			m_app->dispToConsole(QString("[qTracer] ComputeEigen failed (code %1). Pipeline aborted.").arg(rc),
+			m_app->dispToConsole("[qTracer] Could not clone the input cloud (out of memory?). Pipeline aborted.",
 			                     ccMainAppInterface::ERR_CONSOLE_MESSAGE);
 			delete root;
 			return;
+		}
+		work->setName(pc->getName() + QString(" [eigen features]"));
+		root->addChild(work);
+		pc = work;   // <- original stays pristine from here on
+
+		announce(1, "Eigenvector Computing");
+		IdentifyFracture::ErrorCode rc;
+		if (dlg.autoScaleEnabled())
+		{
+			rc = IdentifyFracture::ComputeEigenAutoScale(
+				pc,
+				dlg.autoScaleRMin(),
+				dlg.autoScaleRMax(),
+				dlg.autoScaleSteps(),
+				dlg.autoScaleMinPts(),
+				dlg.autoScaleCriterion(),
+				&progress,
+				nullptr);
+		}
+		else
+		{
+			rc = IdentifyFracture::ComputeEigen(
+				pc,
+				static_cast<PointCoordinateType>(dlg.kernelRadius()),
+				&progress,
+				nullptr);
+		}
+		if (rc != IdentifyFracture::NoError)
+		{
+			m_app->dispToConsole(QString("[qTracer] Eigenvector Computing failed (code %1). Pipeline aborted.").arg(rc),
+			                     ccMainAppInterface::ERR_CONSOLE_MESSAGE);
+			delete root;
+			return;
+		}
+
+		// Refresh every SF's min/max so they display correctly (the fixed-radius
+		// ComputeEigen doesn't do this itself), then show the clone by linearity.
+		for (unsigned i = 0; i < pc->getNumberOfScalarFields(); ++i)
+		{
+			if (ccScalarField* sf = static_cast<ccScalarField*>(pc->getScalarField(static_cast<int>(i))))
+				sf->computeMinAndMax();
+		}
+		const int liIdx = pc->getScalarFieldIndexByName("PC Linearity");
+		if (liIdx >= 0)
+		{
+			pc->setCurrentDisplayedScalarField(liIdx);
+			pc->showSF(true);
 		}
 	}
 
@@ -528,6 +719,7 @@ void qTracer::doPipeline()
 			dlg.mergeMaxNormalAngleDeg(),
 			dlg.mergeMaxPlaneDist(),
 			dlg.mergeMaxPasses(),
+			dlg.mergeDropUnmerged(),
 			&progress);
 		if (mergedGroup)
 		{
@@ -547,8 +739,10 @@ void qTracer::finalizePipelineResult(ccHObject* root,
                                      ccHObject* mergedGroup,
                                      int firstStage)
 {
-	// Only hide the source cloud when we actually touched it (stages 1-3).
-	if (pc && firstStage <= 3)
+	// When we started at stage 1, pc is our eigen-feature CLONE (the original was
+	// left untouched) — keep it shown. Only hide the working cloud on a mid-pipeline
+	// start (stages 2-3), where pc is the user's own selected cloud.
+	if (pc && firstStage >= 2 && firstStage <= 3)
 		pc->setEnabled(false);
 
 	if (root->getChildrenNumber() == 0)

@@ -66,6 +66,24 @@ public:
 		CCCoreLib::GenericProgressCallback* progressCb = nullptr,
 		CCCoreLib::DgmOctree* inputOctree = nullptr);
 
+	//! Per-point auto-scale variant of ComputeEigen.
+	/** For every point, evaluates the PCA linearity L = (λ1-λ2)/λ1 at \p steps kernel
+	 *  radii evenly spaced in [\p rMin, \p rMax], and keeps the radius that MAXIMISES L
+	 *  (only scales whose neighbourhood holds at least \p minNeighbours points count —
+	 *  this guards against the small-scale noise bias of pure linearity maximisation).
+	 *  Fills the same `PC Linearity` + `MaxEigVec_X/Y/Z` scalar fields as ComputeEigen
+	 *  (so stages 2+ are unchanged) plus an `OptScale` field holding the selected radius.
+	 *  The fixed-radius ComputeEigen path is left untouched. */
+	static ErrorCode ComputeEigenAutoScale(
+		CCCoreLib::GenericIndexedCloudPersist* cloud,
+		double rMin,
+		double rMax,
+		unsigned steps,
+		unsigned minNeighbours,
+		int scaleCriterion,   //!< 0 = max linearity, 1 = min eigenentropy
+		CCCoreLib::GenericProgressCallback* progressCb = nullptr,
+		CCCoreLib::DgmOctree* inputOctree = nullptr);
+
 	//! Run the custom DBSCAN-like clustering on a cloud that already has the Eigen SFs
 	static int runDBSCAN(const CCCoreLib::DgmOctree* octree,
 	                     CCCoreLib::GenericIndexedCloudPersist* cloud,
@@ -123,6 +141,7 @@ public:
 	                                      double maxNormalAngleDeg,
 	                                      double maxPlaneDist,
 	                                      unsigned maxPasses = 1,
+	                                      bool dropUnmerged = false,
 	                                      CCCoreLib::GenericProgressCallback* progressCb = nullptr);
 
 private:

@@ -8,6 +8,7 @@ target_sources( ${PROJECT_NAME}
 		${CMAKE_CURRENT_LIST_DIR}/OutcropAreaDlg.h
 		${CMAKE_CURRENT_LIST_DIR}/P21Dlg.h
 		${CMAKE_CURRENT_LIST_DIR}/PipelineDlg.h
+		${CMAKE_CURRENT_LIST_DIR}/TraceLengthFilterDlg.h
 		${CMAKE_CURRENT_LIST_DIR}/disclaimerDialog.h
 		${CMAKE_CURRENT_LIST_DIR}/facetsClassifier.h
 		${CMAKE_CURRENT_LIST_DIR}/qTracer.h

@@ -14,30 +14,40 @@
 //Qt
 #include <QVariant>
 
+#include <queue>
 #include <vector>
 
 
 namespace
 {
 
-//! Depth-first search for a 2-vertex polyline under \p obj.
+//! Breadth-first search for the shallowest 2-vertex polyline under \p obj.
 /** 2-vertex is the "trace" convention used throughout qTracer — matches both
- *  stage-3 per-facet trace polylines and stage-4 combined-trace polylines.
- *  Contour polylines (many vertices) are skipped so a selected `[facets]`
+ *  stage-3 per-facet trace polylines and stage-4 merged-trace polylines.
+ *  Contour polylines (many vertices) are skipped so a selected `[trace pieces]`
  *  group reports trace length, not facet-contour length.
  */
 const ccPolyline* findTracePolyline(const ccHObject* obj)
 {
 	if (!obj) return nullptr;
-	if (obj->isKindOf(CC_TYPES::POLY_LINE))
+	// Breadth-first so the SHALLOWEST 2-vertex polyline wins. This makes a node's
+	// own representative trace (e.g. a stage-4 `Merged trace`'s direct-child
+	// `MergedPolyline`) take precedence over deeper member/piece polylines nested
+	// under it (the `DisperseTrace` of each member, also 2-vertex). A plain DFS
+	// would return the first member piece instead and under-count the length.
+	std::queue<const ccHObject*> q;
+	q.push(obj);
+	while (!q.empty())
 	{
-		const ccPolyline* p = static_cast<const ccPolyline*>(obj);
-		if (p->size() == 2) return p;
-	}
-	for (unsigned i = 0; i < obj->getChildrenNumber(); ++i)
-	{
-		if (const ccPolyline* p = findTracePolyline(obj->getChild(i)))
-			return p;
+		const ccHObject* n = q.front();
+		q.pop();
+		if (n->isKindOf(CC_TYPES::POLY_LINE))
+		{
+			const ccPolyline* p = static_cast<const ccPolyline*>(n);
+			if (p->size() == 2) return p;
+		}
+		for (unsigned i = 0; i < n->getChildrenNumber(); ++i)
+			q.push(n->getChild(i));
 	}
 	return nullptr;
 }
@@ -102,9 +112,9 @@ unsigned countChildrenWithTracePolyline(const ccHObject* group)
 //! whose children contain trace polylines.
 /** Detection is polyline-centric: a "traces group" is any container whose
  *  top-level children each carry a 2-vertex polyline somewhere inside. This
- *  matches both stage-3 `[facets]` groups (polyline nested under each
+ *  matches both stage-3 `[trace pieces]` groups (polyline nested under each
  *  `ccFacet`) and stage-4 `Traces` groups (polyline nested under each
- *  `CombinedTrace N` node) — user picks which convention their P21 uses.
+ *  `Merged trace N` node) — user picks which convention their P21 uses.
  *  Contour polylines (many vertices) are naturally filtered out by the
  *  2-vertex size check inside `findTracePolyline`.
  */

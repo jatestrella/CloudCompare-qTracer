@@ -33,6 +33,7 @@ private:
 	void doColorFilter();
 	void doOutcropArea();
 	void doP21();
+	void doTraceFilter();
 
 	void finalizePipelineResult(class ccHObject* root,
 	                            class ccPointCloud* pc,
@@ -46,4 +47,5 @@ private:
 	QAction* m_colorFilterAction = nullptr;
 	QAction* m_outcropAreaAction = nullptr;
 	QAction* m_p21Action         = nullptr;
+	QAction* m_traceFilterAction = nullptr;
 };

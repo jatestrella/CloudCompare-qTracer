@@ -1,7 +1,75 @@
 #include "PipelineDlg.h"
 
+#include <QCheckBox>
+#include <QComboBox>
+#include <QDoubleSpinBox>
+#include <QFile>
+#include <QFileDialog>
+#include <QGroupBox>
+#include <QHash>
 #include <QMessageBox>
+#include <QPushButton>
+#include <QRegularExpression>
 #include <QSettings>
+#include <QSpinBox>
+#include <QTextStream>
+#include <QVector>
+
+namespace
+{
+	//! Ordered (key, widget) table covering every stage toggle + parameter, so
+	//! export / import / QSettings all speak the same keys.
+	QVector<QPair<QString, QWidget*>> paramList(PipelineDlg* d)
+	{
+		return {
+			{ "stage1", d->eigenGroup }, { "stage2", d->dbscanGroup }, { "stage3", d->tracesGroup },
+			{ "stage4", d->clusteringGroup }, { "stage5", d->planeGroup }, { "stage6", d->mergeGroup },
+			{ "kernelRadius",        d->kernelRadiusSpinBox },
+			{ "autoScaleEnabled",    d->autoScaleCheckBox },
+			{ "autoScaleRMin",       d->autoScaleRMinSpinBox },
+			{ "autoScaleRMax",       d->autoScaleRMaxSpinBox },
+			{ "autoScaleSteps",      d->autoScaleStepsSpinBox },
+			{ "autoScaleMinPts",     d->autoScaleMinPtsSpinBox },
+			{ "autoScaleCriterion",  d->autoScaleCriterionComboBox },
+			{ "dbscanRadius",        d->dbscanRadiusSpinBox },
+			{ "dbscanMinPoints",     d->dbscanMinPointsSpinBox },
+			{ "dbscanMaxAngle",      d->dbscanMaxAngleSpinBox },
+			{ "dbscanLinearity",     d->dbscanLinearitySpinBox },
+			{ "dbscanSearchType",    d->dbscanSearchTypeComboBox },
+			{ "randomColors",        d->randomColorsCheckBox },
+			{ "coneRadius",          d->coneRadiusSpinBox },
+			{ "twoTraceDist",        d->twoTraceDistSpinBox },
+			{ "clusterMinAngle",     d->clusterMinAngleSpinBox },
+			{ "planeIntersectionDist", d->planeIntersectionDistSpinBox },
+			{ "planeMinTraceLen",    d->planeMinTraceLenSpinBox },
+			{ "planeMinAngle",       d->planeMinAngleSpinBox },
+			{ "planeMaxEndPointDist", d->planeMaxEndPointDistSpinBox },
+			{ "mergeMaxNormalAngle", d->mergeMaxNormalAngleSpinBox },
+			{ "mergeMaxPlaneDist",   d->mergeMaxPlaneDistSpinBox },
+			{ "mergeMaxPasses",      d->mergeMaxPassesSpinBox },
+			{ "mergeDropUnmerged",   d->mergeDropUnmergedCheckBox },
+		};
+	}
+
+	QString widgetToStr(QWidget* w)
+	{
+		if (auto* gb = qobject_cast<QGroupBox*>(w))      return gb->isChecked() ? "1" : "0";
+		if (auto* cb = qobject_cast<QCheckBox*>(w))      return cb->isChecked() ? "1" : "0";
+		if (auto* ds = qobject_cast<QDoubleSpinBox*>(w)) return QString::number(ds->value(), 'g', 10);
+		if (auto* sp = qobject_cast<QSpinBox*>(w))       return QString::number(sp->value());
+		if (auto* co = qobject_cast<QComboBox*>(w))      return QString::number(co->currentIndex());
+		return QString();
+	}
+
+	void strToWidget(QWidget* w, const QString& v)
+	{
+		if (auto* gb = qobject_cast<QGroupBox*>(w))      { gb->setChecked(v.toInt() != 0); return; }
+		if (auto* cb = qobject_cast<QCheckBox*>(w))      { cb->setChecked(v.toInt() != 0); return; }
+		if (auto* ds = qobject_cast<QDoubleSpinBox*>(w)) { ds->setValue(v.toDouble()); return; }
+		if (auto* sp = qobject_cast<QSpinBox*>(w))       { sp->setValue(v.toInt()); return; }
+		if (auto* co = qobject_cast<QComboBox*>(w))      { co->setCurrentIndex(v.toInt()); return; }
+	}
+}
 
 namespace
 {
@@ -15,6 +83,9 @@ PipelineDlg::PipelineDlg(QWidget* parent)
 	, Ui::PipelineDialog()
 {
 	setupUi(this);
+
+	connect(exportParamsButton, &QPushButton::clicked, this, &PipelineDlg::onExportParams);
+	connect(importParamsButton, &QPushButton::clicked, this, &PipelineDlg::onImportParams);
 
 	// Restore the last-used stage selection. Default to all-checked on first run.
 	{
@@ -37,6 +108,12 @@ PipelineDlg::PipelineDlg(QWidget* parent)
 
 		// Stage 1
 		kernelRadiusSpinBox        ->setValue(s.value("kernelRadius",        kernelRadiusSpinBox        ->value()).toDouble());
+		autoScaleCheckBox          ->setChecked(s.value("autoScaleEnabled",  autoScaleCheckBox          ->isChecked()).toBool());
+		autoScaleRMinSpinBox       ->setValue(s.value("autoScaleRMin",       autoScaleRMinSpinBox       ->value()).toDouble());
+		autoScaleRMaxSpinBox       ->setValue(s.value("autoScaleRMax",       autoScaleRMaxSpinBox       ->value()).toDouble());
+		autoScaleStepsSpinBox      ->setValue(s.value("autoScaleSteps",      autoScaleStepsSpinBox      ->value()).toInt());
+		autoScaleMinPtsSpinBox     ->setValue(s.value("autoScaleMinPts",     autoScaleMinPtsSpinBox     ->value()).toInt());
+		autoScaleCriterionComboBox ->setCurrentIndex(s.value("autoScaleCriterion", autoScaleCriterionComboBox->currentIndex()).toInt());
 
 		// Stage 2
 		dbscanRadiusSpinBox        ->setValue(s.value("dbscanRadius",        dbscanRadiusSpinBox        ->value()).toDouble());
@@ -63,6 +140,7 @@ PipelineDlg::PipelineDlg(QWidget* parent)
 		mergeMaxNormalAngleSpinBox ->setValue(s.value("mergeMaxNormalAngle", mergeMaxNormalAngleSpinBox ->value()).toDouble());
 		mergeMaxPlaneDistSpinBox   ->setValue(s.value("mergeMaxPlaneDist",   mergeMaxPlaneDistSpinBox   ->value()).toDouble());
 		mergeMaxPassesSpinBox      ->setValue(s.value("mergeMaxPasses",      mergeMaxPassesSpinBox      ->value()).toInt());
+		mergeDropUnmergedCheckBox  ->setChecked(s.value("mergeDropUnmerged", mergeDropUnmergedCheckBox  ->isChecked()).toBool());
 
 		s.endGroup();
 	}
@@ -151,6 +229,12 @@ void PipelineDlg::accept()
 		s.beginGroup(kParamSettingsGroup);
 
 		s.setValue("kernelRadius",         kernelRadiusSpinBox->value());
+		s.setValue("autoScaleEnabled",     autoScaleCheckBox->isChecked());
+		s.setValue("autoScaleRMin",        autoScaleRMinSpinBox->value());
+		s.setValue("autoScaleRMax",        autoScaleRMaxSpinBox->value());
+		s.setValue("autoScaleSteps",       autoScaleStepsSpinBox->value());
+		s.setValue("autoScaleMinPts",      autoScaleMinPtsSpinBox->value());
+		s.setValue("autoScaleCriterion",   autoScaleCriterionComboBox->currentIndex());
 
 		s.setValue("dbscanRadius",         dbscanRadiusSpinBox->value());
 		s.setValue("dbscanMinPoints",      dbscanMinPointsSpinBox->value());
@@ -172,9 +256,72 @@ void PipelineDlg::accept()
 		s.setValue("mergeMaxNormalAngle",  mergeMaxNormalAngleSpinBox->value());
 		s.setValue("mergeMaxPlaneDist",    mergeMaxPlaneDistSpinBox->value());
 		s.setValue("mergeMaxPasses",       mergeMaxPassesSpinBox->value());
+		s.setValue("mergeDropUnmerged",    mergeDropUnmergedCheckBox->isChecked());
 
 		s.endGroup();
 	}
 
 	QDialog::accept();
+}
+
+
+void PipelineDlg::onExportParams()
+{
+	QString fn = QFileDialog::getSaveFileName(this, tr("Export pipeline parameters"),
+		"qtracer_params.txt", tr("Text files (*.txt);;All files (*)"));
+	if (fn.isEmpty())
+		return;
+
+	QFile f(fn);
+	if (!f.open(QIODevice::WriteOnly | QIODevice::Text))
+	{
+		QMessageBox::warning(this, tr("Export failed"), tr("Could not open the file for writing."));
+		return;
+	}
+	QTextStream out(&f);
+	out << "# qTracer pipeline parameters (key <TAB> value)\n";
+	for (const auto& kv : paramList(this))
+		out << kv.first << '\t' << widgetToStr(kv.second) << '\n';
+	f.close();
+}
+
+
+void PipelineDlg::onImportParams()
+{
+	QString fn = QFileDialog::getOpenFileName(this, tr("Import pipeline parameters"),
+		QString(), tr("Text files (*.txt);;All files (*)"));
+	if (fn.isEmpty())
+		return;
+
+	QFile f(fn);
+	if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
+	{
+		QMessageBox::warning(this, tr("Import failed"), tr("Could not open the file for reading."));
+		return;
+	}
+
+	QHash<QString, QWidget*> map;
+	for (const auto& kv : paramList(this))
+		map.insert(kv.first, kv.second);
+
+	QTextStream in(&f);
+	int applied = 0, unknown = 0;
+	while (!in.atEnd())
+	{
+		const QString line = in.readLine().trimmed();
+		if (line.isEmpty() || line.startsWith('#'))
+			continue;
+		const QStringList parts = line.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+		if (parts.size() < 2)
+			continue;
+		auto it = map.find(parts[0]);
+		if (it != map.end()) { strToWidget(it.value(), parts[1]); ++applied; }
+		else                 { ++unknown; }
+	}
+	f.close();
+
+	QMessageBox::information(this, tr("Import parameters"),
+		tr("Applied %1 parameter(s)%2.")
+			.arg(applied)
+			.arg(unknown > 0 ? tr(", %1 unknown key(s) ignored").arg(unknown) : QString()));
 }

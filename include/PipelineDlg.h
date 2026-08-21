@@ -10,6 +10,12 @@ public:
 
 	void accept() override;
 
+private slots:
+	void onExportParams();
+	void onImportParams();
+
+public:
+
 	// --- Which stages to run ---
 	bool stage1Enabled() const { return eigenGroup->isChecked(); }
 	bool stage2Enabled() const { return dbscanGroup->isChecked(); }
@@ -25,6 +31,13 @@ public:
 
 	// Stage 1
 	double kernelRadius() const { return kernelRadiusSpinBox->value(); }
+	bool     autoScaleEnabled()  const { return autoScaleCheckBox->isChecked(); }
+	double   autoScaleRMin()     const { return autoScaleRMinSpinBox->value(); }
+	double   autoScaleRMax()     const { return autoScaleRMaxSpinBox->value(); }
+	unsigned autoScaleSteps()    const { return static_cast<unsigned>(autoScaleStepsSpinBox->value()); }
+	unsigned autoScaleMinPts()   const { return static_cast<unsigned>(autoScaleMinPtsSpinBox->value()); }
+	//! 0 = max linearity, 1 = min eigenentropy (combobox item 0 = eigenentropy)
+	int      autoScaleCriterion() const { return autoScaleCriterionComboBox->currentIndex() == 0 ? 1 : 0; }
 
 	// Stage 2
 	double       dbscanRadius()           const { return dbscanRadiusSpinBox->value(); }
@@ -51,4 +64,5 @@ public:
 	double   mergeMaxNormalAngleDeg() const { return mergeMaxNormalAngleSpinBox->value(); }
 	double   mergeMaxPlaneDist()      const { return mergeMaxPlaneDistSpinBox->value(); }
 	unsigned mergeMaxPasses()         const { return static_cast<unsigned>(mergeMaxPassesSpinBox->value()); }
+	bool     mergeDropUnmerged()      const { return mergeDropUnmergedCheckBox->isChecked(); }
 };
