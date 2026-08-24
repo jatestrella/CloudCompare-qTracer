@@ -622,8 +622,10 @@ void qTracer::doPipeline()
 			return;
 		}
 
-		// remove DBSCAN SF so it doesn't get copied into every sub-cloud
-		pc->deleteScalarField(dbscanSFIdx);
+		// Keep the DBSCAN SF: partialClone will copy it into every trace-piece
+		// cloud (all points of a component share one cluster id), so each piece
+		// remembers which DBSCAN cluster it came from. (2026-08-22 — reverses the
+		// original "delete before cloning" behaviour at the user's request.)
 
 		bool err = false;
 		facetsGroup = IdentifyFracture::createTraces(pc, components, dlg.randomColors(), err, &progress);

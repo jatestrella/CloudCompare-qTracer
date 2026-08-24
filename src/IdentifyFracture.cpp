@@ -1013,6 +1013,15 @@ ccHObject* IdentifyFracture::createTraces(ccPointCloud* cloud,
 		}
 		else
 		{
+			// The DBSCAN SF (if still present) was copied in by partialClone and
+			// holds this piece's cluster id on every point — make it display-ready.
+			int dbscanIdx = facetCloud->getScalarFieldIndexByName("DBSCAN");
+			if (dbscanIdx >= 0)
+			{
+				facetCloud->getScalarField(dbscanIdx)->computeMinAndMax();
+				facetCloud->setCurrentDisplayedScalarField(dbscanIdx);
+			}
+
 			ccFacet* facet = ccFacet::Create(facetCloud, 0, true);
 			if (facet)
 			{

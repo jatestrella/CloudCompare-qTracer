@@ -52,7 +52,7 @@ These changes are intentional — don't silently undo them:
 - `DBSCANParams` struct — the original `expandCluster` hard-coded `radius=0.03`, `minPoints=50`, `maxAngleDeg=15`, `linearityThreshold=0.9`, `searchType=1` at the top of the function, **overriding the `radius` argument**. Now all 5 flow through `PipelineDlg` via the struct. The override lines were removed so the dialog actually controls behavior.
 - `ComputeEigen` no longer calls `runDBSCAN` at its end — each stage is invoked explicitly from `qTracer.cpp::doPipeline()`.
 - `<ppl.h>` removed (was an unused include).
-- At the start of stage 3 the `DBSCAN` SF is deleted from the source cloud so `partialClone` doesn't copy it into every sub-cloud. Same behavior as the standalone source.
+- Stage 3 **keeps** the `DBSCAN` SF (2026-08-22, user request): `partialClone` copies it into every trace-piece cloud so each `Trace piece N` remembers its DBSCAN cluster id (all points of a component share one id; `createTraces` runs `computeMinAndMax` + sets it as the displayed SF so it renders). This reverses the original standalone behaviour, which deleted the SF at the start of stage 3 so it wasn't copied into every sub-cloud.
 - `GetCloudLinearity` was dead code in the original port; removed.
 
 ## Post-port improvements (deviations from the frozen reference)
