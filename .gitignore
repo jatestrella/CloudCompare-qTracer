@@ -33,3 +33,6 @@ CTestTestfile.cmake
 # OS
 Thumbs.db
 .DS_Store
+
+# Claude Code local settings (per-user, not for distribution)
+.claude/

@@ -134,13 +134,9 @@ All stage outputs are added under one parent DB node `qTracer [<cloud name>]`.
 
 ## Installation
 
-The plugin must be ABI-compatible with your CloudCompare build, so the
-recommended path is to **build it from source against the same CloudCompare
-version you are running**. Pre-built binaries may be attached to the repo's
-[Releases] page; they only work when built against the exact CloudCompare
-version you use.
-
-[Releases]: ../../releases
+A compiled plugin is only ABI-compatible with the exact CloudCompare build it
+was built against, so **no pre-built binary is distributed** — build the plugin
+from source against the same CloudCompare version you are running.
 
 ### Build from source
 
@@ -178,17 +174,6 @@ itself needs — 3.18 or newer), a C++17 toolchain (MSVC on Windows), and Qt 6.
 Dependencies: **Qt 6** (`Core`, `Gui`, `Widgets`, `Svg`, `PrintSupport`) and
 **QCustomPlot** (vendored by CloudCompare at `qCC/extern/QCustomPlot`, linked
 automatically). No external geometry libraries required.
-
-### Installing a pre-built binary (if available)
-
-1. Download the plugin binary (`qTracer.dll` / `.so` / `.dylib`).
-2. Copy it into CloudCompare's **plugins** folder:
-   - **Windows**: `C:\Program Files\CloudCompare\plugins\`
-   - **Linux**: `<install prefix>/lib/cloudcompare/plugins/`
-   - **macOS**: *CloudCompare.app* → *Show Package Contents* →
-     `Contents/Plugins/ccPlugins/`
-3. Restart CloudCompare. If you see "plugin failed to load", the binary and your
-   CloudCompare version are ABI-incompatible — rebuild from source.
 
 ---
 
