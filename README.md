@@ -153,7 +153,7 @@ itself needs — 3.18 or newer), a C++17 toolchain (MSVC on Windows), and Qt 6.
 2. Clone this plugin into CloudCompare's Standard-plugin folder, as a directory
    named `qTracer`:
    ```bash
-   git clone https://github.com/jatestrella/CCplugin-qTracer.git \
+   git clone https://github.com/jatestrella/CloudCompare-qTracer.git \
        <CloudCompare>/plugins/core/Standard/qTracer
    ```
    (The folder must be named `qTracer` — the repo name differs, so give the
