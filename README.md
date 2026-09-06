@@ -153,8 +153,14 @@ Requires the CloudCompare source tree, a C++17 toolchain, and Qt 6.
    cd CloudCompare && git checkout 5cba96f4 && git submodule update --init --recursive
    ```
    (Newer commits may also work, but the plugin API is only guaranteed here.)
-2. Place this plugin directory at
-   `<CloudCompare>/plugins/core/Standard/qTracer`.
+2. Clone this plugin into CloudCompare's Standard-plugin folder, as a directory
+   named `qTracer`:
+   ```bash
+   git clone https://github.com/jatestrella/CCplugin-qTracer.git \
+       <CloudCompare>/plugins/core/Standard/qTracer
+   ```
+   (The folder must be named `qTracer` — the repo name differs, so give the
+   target path explicitly as above.)
 3. Configure with the plugin option enabled:
    ```bash
    cmake -S <CloudCompare> -B <build> -DPLUGIN_STANDARD_QTRACER=ON
