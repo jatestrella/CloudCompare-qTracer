@@ -105,6 +105,7 @@ QList<QAction*> qTracer::getActions()
 		m_traceFilterAction = new QAction("Filter Traces by Length…", this);
 		m_traceFilterAction->setToolTip("Interactively remove short (or over-long) traces from a Traces group,\n"
 		                                "with a draggable length histogram and live 3D preview.");
+		m_traceFilterAction->setIcon(QIcon(":/CC/plugin/qTracer/images/icon_tracefilter.svg"));
 		connect(m_traceFilterAction, &QAction::triggered, this, &qTracer::doTraceFilter);
 	}
 	return { m_colorFilterAction, m_outcropAreaAction, m_p21Action, m_traceFilterAction, m_action };

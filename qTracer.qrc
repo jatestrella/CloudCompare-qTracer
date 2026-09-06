@@ -7,6 +7,7 @@
     <file>images/icon_colorfilter.svg</file>
     <file>images/icon_outcroparea.svg</file>
     <file>images/icon_p21.svg</file>
+    <file>images/icon_tracefilter.svg</file>
     <file>info.json</file>
   </qresource>
 </RCC>
