@@ -1,5 +1,8 @@
 # qTracer — CloudCompare Plugin
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22549787.svg)](https://doi.org/10.5281/zenodo.22549787)
+[![License: GPL v2](https://img.shields.io/badge/License-GPLv2%20or%20later-blue.svg)](LICENSE)
+
 A **CloudCompare** Standard plugin for extracting **Discrete Fracture Network
 (DFN)** traces, joint planes, and fracture-intensity statistics from
 rock-outcrop point clouds.
