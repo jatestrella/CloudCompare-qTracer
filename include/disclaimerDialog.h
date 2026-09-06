@@ -1,6 +1,6 @@
 //##########################################################################
 //#                                                                        #
-//#                     CLOUDCOMPARE PLUGIN: qFacets                       #
+//#                     CLOUDCOMPARE PLUGIN: qTracer                       #
 //#                                                                        #
 //#  This program is free software; you can redistribute it and/or modify  #
 //#  it under the terms of the GNU General Public License as published by  #
@@ -11,7 +11,7 @@
 //#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
 //#  GNU General Public License for more details.                          #
 //#                                                                        #
-//#                      COPYRIGHT: Thomas Dewez, BRGM                     #
+//#                 COPYRIGHT: Chia-Chi (Jate) Chiu, NTUT                  #
 //#                                                                        #
 //##########################################################################
 
@@ -63,4 +63,4 @@ static bool ShowDisclaimer(ccMainAppInterface* app)
 	return s_disclaimerAccepted;
 }
 
-#endif //QFACET_DISCLAIMER_DIALOG_HEADER
+#endif //QTRACER_DISCLAIMER_DIALOG_HEADER

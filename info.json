@@ -5,13 +5,13 @@
 	"description" : "Extracts fracture traces from rock-outcrop point clouds (DBSCAN-based pipeline) and computes outcrop surface area + P21 fracture intensity.",
 	"authors" : [
 		{
-			"name" : "Jate Chia-Chi Chiu",
+			"name" : "Chia-Chi (Jate) Chiu",
 			"email" : "ccchiu@ntut.edu.tw"
 		}
 	],
 	"maintainers" : [
 		{
-			"name" : "Jate Chia-Chi Chiu",
+			"name" : "Chia-Chi (Jate) Chiu",
 			"email" : "ccchiu@ntut.edu.tw"
 		}
 	],
