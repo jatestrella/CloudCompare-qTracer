@@ -144,7 +144,8 @@ version you use.
 
 ### Build from source
 
-Requires the CloudCompare source tree, a C++17 toolchain, and Qt 6.
+Requires the CloudCompare source tree, **CMake** (the version CloudCompare
+itself needs — 3.18 or newer), a C++17 toolchain (MSVC on Windows), and Qt 6.
 
 1. Clone CloudCompare and check out the pinned version this plugin is known to
    build against — **`v2.13.1-344-g5cba96f4`** (commit `5cba96f4`):
