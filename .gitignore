@@ -34,5 +34,6 @@ CTestTestfile.cmake
 Thumbs.db
 .DS_Store
 
-# Claude Code local settings (per-user, not for distribution)
+# Claude Code local settings + project notes (per-user, not for distribution)
 .claude/
+CLAUDE.md
